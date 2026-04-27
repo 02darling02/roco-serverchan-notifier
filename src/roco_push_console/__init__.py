@@ -1,6 +1,5 @@
-"""Roco merchant notifier using ServerChan."""
+"""Roco merchant push console."""
 
 __all__ = ["__version__"]
 
 __version__ = "0.1.0"
-

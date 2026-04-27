@@ -10,9 +10,8 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from roco_serverchan_notifier.app import main
+from roco_push_console.app import main
 
 
 if __name__ == "__main__":
     raise SystemExit(asyncio.run(main()))
-

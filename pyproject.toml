@@ -1,7 +1,7 @@
 [project]
 name = "roco-push-console"
 version = "0.1.0"
-description = "Roco merchant notifier with a Docker web console and pluggable push providers."
+description = "Roco merchant push console with Docker scheduling and pluggable providers."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -12,9 +12,9 @@ dependencies = [
 ]
 
 [project.scripts]
-roco-push-once = "roco_serverchan_notifier.app:cli"
-roco-push-scheduler = "roco_serverchan_notifier.scheduler:cli"
-roco-push-console = "roco_serverchan_notifier.web:cli"
+roco-push-once = "roco_push_console.app:cli"
+roco-push-scheduler = "roco_push_console.scheduler:cli"
+roco-push-console = "roco_push_console.web:cli"
 
 [tool.uv]
 package = true

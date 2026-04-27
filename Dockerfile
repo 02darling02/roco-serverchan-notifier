@@ -38,4 +38,4 @@ EXPOSE 19892
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD python -c "import os, socket; s = socket.create_connection(('127.0.0.1', int(os.environ.get('WEB_PORT', '19892'))), 3); s.close()"
 
-CMD ["python", "-m", "roco_serverchan_notifier.web"]
+CMD ["python", "-m", "roco_push_console.web"]

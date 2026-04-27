@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import os
 import secrets
+import time
 from datetime import datetime
-from typing import Annotated, Any
+from html import escape
+from typing import Any
+from urllib.parse import quote
 
 import requests
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .config import ConfigStore, Settings
 from .provider_specs import PROVIDER_TYPES
@@ -19,7 +24,7 @@ from .scheduler import SchedulerService, parse_schedule_times
 from .time_utils import beijing_now
 
 
-security = HTTPBasic(auto_error=False)
+SESSION_COOKIE_NAME = "roco_console_session"
 store = ConfigStore()
 scheduler = SchedulerService(store)
 app = FastAPI(title="Roco Push Console")
@@ -29,28 +34,123 @@ def _format_dt(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d %H:%M:%S") if value else "-"
 
 
-def _require_auth(credentials: Annotated[HTTPBasicCredentials | None, Depends(security)]) -> None:
-    password = os.environ.get("CONSOLE_PASSWORD", "")
-    if not password:
-        return
+def _auth_password() -> str:
+    return os.environ.get("CONSOLE_PASSWORD", "").strip()
 
-    username = os.environ.get("CONSOLE_USERNAME", "admin")
-    valid = (
-        credentials is not None
-        and secrets.compare_digest(credentials.username, username)
-        and secrets.compare_digest(credentials.password, password)
-    )
-    if not valid:
-        raise HTTPException(
-            status_code=401,
-            detail="需要控制台密码",
-            headers={"WWW-Authenticate": "Basic"},
-        )
+
+def _auth_username() -> str:
+    return os.environ.get("CONSOLE_USERNAME", "admin").strip() or "admin"
+
+
+def _session_ttl() -> int:
+    try:
+        return max(300, int(os.environ.get("CONSOLE_SESSION_TTL", "86400")))
+    except ValueError:
+        return 86400
+
+
+def _session_secret() -> bytes:
+    seed = os.environ.get("CONSOLE_SESSION_SECRET") or _auth_password() or "roco-push-console"
+    return seed.encode("utf-8")
+
+
+def _sign_session(username: str, expires_at: int, nonce: str) -> str:
+    body = f"{username}|{expires_at}|{nonce}".encode("utf-8")
+    return hmac.new(_session_secret(), body, hashlib.sha256).hexdigest()
+
+
+def _make_session_cookie(username: str) -> str:
+    expires_at = int(time.time()) + _session_ttl()
+    nonce = secrets.token_urlsafe(12)
+    signature = _sign_session(username, expires_at, nonce)
+    token = f"{username}|{expires_at}|{nonce}|{signature}".encode("utf-8")
+    return base64.urlsafe_b64encode(token).decode("ascii")
+
+
+def _valid_session_cookie(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        decoded = base64.urlsafe_b64decode(value.encode("ascii")).decode("utf-8")
+        username, expires_text, nonce, signature = decoded.split("|", 3)
+        expires_at = int(expires_text)
+    except (ValueError, UnicodeDecodeError):
+        return False
+    if expires_at < int(time.time()):
+        return False
+    if not secrets.compare_digest(username, _auth_username()):
+        return False
+    expected = _sign_session(username, expires_at, nonce)
+    return secrets.compare_digest(signature, expected)
+
+
+def _is_authenticated(request: Request) -> bool:
+    password = _auth_password()
+    if not password:
+        return True
+    return _valid_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
+
+
+def _require_auth(request: Request) -> None:
+    if not _is_authenticated(request):
+        raise HTTPException(status_code=401, detail="请先登录控制台")
 
 
 @app.on_event("startup")
 async def startup() -> None:
     scheduler.start()
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse | RedirectResponse:
+    if exc.status_code == 401 and not request.url.path.startswith("/api/"):
+        next_path = request.url.path
+        if request.url.query:
+            next_path = f"{next_path}?{request.url.query}"
+        return RedirectResponse(f"/login?next={quote(next_path, safe='/?:=&')}", status_code=303)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    if not _auth_password() or _is_authenticated(request):
+        return RedirectResponse("/", status_code=303)
+    return HTMLResponse(render_login_html())
+
+
+@app.post("/api/login")
+async def api_login(request: Request) -> JSONResponse:
+    if not _auth_password():
+        return JSONResponse({"ok": True, "message": "未启用控制台认证"})
+
+    try:
+        payload = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="登录参数格式错误") from exc
+
+    username = str(payload.get("username", "")).strip()
+    password = str(payload.get("password", ""))
+    valid = secrets.compare_digest(username, _auth_username()) and secrets.compare_digest(password, _auth_password())
+    if not valid:
+        raise HTTPException(status_code=401, detail="用户名或密码不正确")
+
+    response = JSONResponse({"ok": True, "message": "登录成功"})
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        _make_session_cookie(username),
+        max_age=_session_ttl(),
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+    )
+    return response
+
+
+@app.post("/api/logout")
+async def api_logout() -> JSONResponse:
+    response = JSONResponse({"ok": True, "message": "已退出登录"})
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return response
 
 
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(_require_auth)])
@@ -71,6 +171,7 @@ async def api_state() -> dict[str, Any]:
         "config_issue": store.load_issue_dict(),
         "provider_types": PROVIDER_TYPES,
         "scheduler": scheduler.state.to_dict(),
+        "auth_enabled": bool(_auth_password()),
         "now": beijing_now().isoformat(),
     }
 
@@ -165,7 +266,290 @@ def _settings_from_test_payload(payload: Any) -> Settings:
 def cli() -> None:
     host = os.environ.get("WEB_HOST", "0.0.0.0")
     port = int(os.environ.get("WEB_PORT", "19892"))
-    uvicorn.run("roco_serverchan_notifier.web:app", host=host, port=port)
+    uvicorn.run("roco_push_console.web:app", host=host, port=port)
+
+
+def render_login_html() -> str:
+    return LOGIN_HTML_TEMPLATE.replace("__USERNAME__", escape(_auth_username(), quote=True))
+
+
+LOGIN_HTML_TEMPLATE = r"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录远行商人推送控制台</title>
+  <link rel="icon" href='data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" rx="16" fill="%230071e3"/%3E%3Cpath d="M18 36h28v10H18zM22 20h20v10H22z" fill="white"/%3E%3C/svg%3E'>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f5f7;
+      --panel: rgba(255,255,255,.82);
+      --panel-strong: rgba(255,255,255,.94);
+      --ink: #1d1d1f;
+      --muted: #6e6e73;
+      --line: rgba(0,0,0,.12);
+      --soft-line: rgba(0,0,0,.07);
+      --accent: #0071e3;
+      --accent-dark: #0057b8;
+      --ok: #1f8f55;
+      --danger: #c13b2a;
+      --shadow: 0 34px 90px rgba(0,0,0,.14);
+      --soft-shadow: 0 12px 32px rgba(0,0,0,.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        linear-gradient(135deg, rgba(0,113,227,.08), transparent 34%),
+        linear-gradient(225deg, rgba(52,199,89,.08), transparent 32%),
+        linear-gradient(180deg, #fbfbfd 0%, #f5f5f7 52%, #efeff4 100%),
+        var(--bg);
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+    .login-shell {
+      width: min(100%, 920px);
+      display: grid;
+      gap: 14px;
+    }
+    .login-card {
+      display: grid;
+      grid-template-columns: minmax(0, .92fr) minmax(340px, .72fr);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.78);
+      border-radius: 34px;
+      background: rgba(255,255,255,.52);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(28px) saturate(1.2);
+      -webkit-backdrop-filter: blur(28px) saturate(1.2);
+    }
+    .brand, .panel { min-height: 520px; }
+    .brand {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 34px;
+      background:
+        linear-gradient(150deg, rgba(255,255,255,.72), rgba(255,255,255,.28)),
+        linear-gradient(180deg, rgba(0,113,227,.08), rgba(255,255,255,0));
+      border-right: 1px solid var(--soft-line);
+    }
+    .brand::after {
+      content: "";
+      position: absolute;
+      inset: auto 34px 30px 34px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,0,0,.12), transparent);
+    }
+    .brand-top { display: grid; gap: 20px; align-content: start; }
+    .app-icon {
+      width: 70px;
+      height: 70px;
+      border-radius: 22px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, #0a84ff, #0066cc);
+      box-shadow: 0 20px 44px rgba(0,113,227,.30), inset 0 1px 0 rgba(255,255,255,.42);
+    }
+    .app-icon svg { width: 42px; height: 42px; fill: #fff; }
+    .eyebrow {
+      width: fit-content;
+      padding: 6px 11px;
+      border: 1px solid rgba(0,113,227,.18);
+      border-radius: 999px;
+      background: rgba(255,255,255,.74);
+      color: var(--accent-dark);
+      font-size: 12px;
+      font-weight: 650;
+      box-shadow: 0 1px 0 rgba(255,255,255,.76) inset;
+    }
+    h1 { margin: 0; max-width: 8em; font-size: 34px; line-height: 1.12; font-weight: 730; }
+    .sub { max-width: 28em; color: var(--muted); font-size: 15px; line-height: 1.65; }
+    .brand-bottom {
+      position: relative;
+      display: grid;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .status-pill {
+      width: fit-content;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--soft-line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.76);
+      color: var(--ink);
+      box-shadow: var(--soft-shadow);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 0 4px rgba(31,143,85,.12);
+    }
+    .panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 38px;
+      background: var(--panel-strong);
+    }
+    .form-head { display: grid; gap: 7px; margin-bottom: 24px; }
+    .form-title { font-size: 24px; font-weight: 720; line-height: 1.2; }
+    .form-sub { color: var(--muted); font-size: 14px; line-height: 1.55; }
+    form { display: grid; gap: 15px; }
+    label { display: grid; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 550; }
+    input {
+      width: 100%;
+      height: 48px;
+      border: 1px solid var(--soft-line);
+      border-radius: 15px;
+      padding: 0 14px;
+      background: rgba(255,255,255,.92);
+      color: var(--ink);
+      font-size: 15px;
+      outline: none;
+      box-shadow: 0 1px 0 rgba(255,255,255,.88) inset;
+      transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+    input:focus {
+      border-color: rgba(0,113,227,.55);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(0,113,227,.12);
+    }
+    button {
+      height: 48px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 650;
+      cursor: pointer;
+      box-shadow: 0 12px 26px rgba(0,113,227,.22);
+      transition: transform .16s ease, box-shadow .16s ease, opacity .16s ease;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 16px 34px rgba(0,113,227,.26); }
+    button:disabled { opacity: .58; cursor: wait; transform: none; }
+    .message {
+      min-height: 21px;
+      color: var(--danger);
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .footnote {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      text-align: center;
+      padding: 0 16px;
+    }
+    @media (max-width: 760px) {
+      body { padding: 18px; place-items: start center; }
+      .login-card { grid-template-columns: 1fr; border-radius: 28px; }
+      .brand, .panel { min-height: auto; }
+      .brand { padding: 26px; gap: 24px; border-right: 0; border-bottom: 1px solid var(--soft-line); }
+      .brand::after { display: none; }
+      .panel { padding: 26px; }
+      h1 { max-width: none; font-size: 28px; }
+      .sub { font-size: 14px; }
+    }
+    @media (max-width: 420px) {
+      body { padding: 12px; }
+      .login-card { border-radius: 24px; }
+      .brand, .panel { padding: 22px; }
+      .app-icon { width: 60px; height: 60px; border-radius: 18px; }
+      .app-icon svg { width: 36px; height: 36px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="login-shell">
+    <section class="login-card" aria-label="控制台登录">
+      <div class="brand">
+        <div class="brand-top">
+          <div class="app-icon" aria-hidden="true">
+            <svg viewBox="0 0 64 64"><path d="M18 36h28v10H18zM22 20h20v10H22z"/></svg>
+          </div>
+          <div class="eyebrow">Docker 控制台 · 19892</div>
+          <div>
+            <h1>远行商人推送控制台</h1>
+            <div class="sub">管理定时任务、数据接口与多通道推送。</div>
+          </div>
+        </div>
+        <div class="brand-bottom">
+          <div class="status-pill"><span class="status-dot"></span><span>本地会话保护已启用</span></div>
+          <div>建议仅在可信网络中访问控制台，并为容器设置独立密码。</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="form-head">
+          <div class="form-title">访问验证</div>
+          <div class="form-sub">输入控制台账号后继续。</div>
+        </div>
+        <form id="loginForm">
+          <label>
+            用户名
+            <input id="username" autocomplete="username" value="__USERNAME__">
+          </label>
+          <label>
+            密码
+            <input id="password" type="password" autocomplete="current-password" autofocus>
+          </label>
+          <button id="loginBtn" type="submit">登录控制台</button>
+          <div id="message" class="message" role="status" aria-live="polite"></div>
+        </form>
+      </div>
+    </section>
+    <div class="footnote">会话凭据使用 HttpOnly Cookie 保存。密码为空时会关闭认证。</div>
+  </main>
+  <script>
+    const form = document.getElementById("loginForm");
+    const button = document.getElementById("loginBtn");
+    const message = document.getElementById("message");
+    function nextUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next") || "/";
+      return next.startsWith("/") ? next : "/";
+    }
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      button.disabled = true;
+      message.textContent = "";
+      try {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            username: document.getElementById("username").value.trim(),
+            password: document.getElementById("password").value,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || data.message || "登录失败");
+        window.location.assign(nextUrl());
+      } catch (error) {
+        message.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>"""
 
 
 INDEX_HTML = r"""<!doctype html>
@@ -385,6 +769,7 @@ INDEX_HTML = r"""<!doctype html>
         <span id="configuredBadge" class="badge warn">未配置</span>
         <span id="runningBadge" class="badge">调度器</span>
         <span id="nowBadge" class="badge mono">--:--</span>
+        <button id="logoutBtn" class="subtle" type="button">退出</button>
       </div>
     </header>
 
@@ -712,6 +1097,7 @@ INDEX_HTML = r"""<!doctype html>
       $("busyBadge").textContent = state.in_progress ? "执行中" : "空闲";
       $("busyBadge").className = state.in_progress ? "badge warn" : "badge ok";
       $("nowBadge").textContent = prettyTime(data.now);
+      $("logoutBtn").hidden = !data.auth_enabled;
       $("nextRun").textContent = prettyTime(state.next_run_at);
       $("lastStart").textContent = prettyTime(state.last_started_at);
       $("lastFinish").textContent = prettyTime(state.last_finished_at);
@@ -812,6 +1198,13 @@ INDEX_HTML = r"""<!doctype html>
         $("message").textContent = error.message;
       } finally {
         setBusy(false);
+      }
+    });
+    $("logoutBtn").addEventListener("click", async () => {
+      try {
+        await requestJSON("/api/logout", {method: "POST", body: "{}"});
+      } finally {
+        window.location.assign("/login");
       }
     });
     $("refreshBtn").addEventListener("click", () => loadState({preserveDraft: configDirty}));

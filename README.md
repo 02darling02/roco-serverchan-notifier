@@ -174,7 +174,7 @@ cp ./data/config.json ./config.backup.json
 
 ```bash
 uv sync --frozen
-uv run python -m roco_serverchan_notifier.web
+uv run python -m roco_push_console.web
 ```
 
 一次性执行：
