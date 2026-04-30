@@ -6,6 +6,7 @@ param(
     [string]$ServerChanSendkey = "",
     [string]$TriggerToken = "",
     [switch]$ConfigureSecrets,
+    [switch]$NonInteractive,
     [switch]$SkipChecks,
     [switch]$SkipTokenVerify,
     [switch]$DryRun
@@ -32,6 +33,28 @@ function Invoke-External {
     & $FilePath @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Command failed: $FilePath $($Arguments -join ' ')"
+    }
+}
+
+function Read-YesNo {
+    param(
+        [Parameter(Mandatory = $true)][string]$Prompt,
+        [bool]$DefaultYes = $true
+    )
+
+    $suffix = if ($DefaultYes) { "[Y/n]" } else { "[y/N]" }
+    while ($true) {
+        $answer = (Read-Host "$Prompt $suffix").Trim().ToLowerInvariant()
+        if ([string]::IsNullOrWhiteSpace($answer)) {
+            return $DefaultYes
+        }
+        if ($answer -in @("y", "yes")) {
+            return $true
+        }
+        if ($answer -in @("n", "no")) {
+            return $false
+        }
+        Write-Host "Please answer y or n." -ForegroundColor Yellow
     }
 }
 
@@ -95,12 +118,35 @@ $PreviousToken = if ($HadToken) { $env:CLOUDFLARE_API_TOKEN } else { "" }
 $TokenWasSetByScript = $false
 
 try {
+    $HasSecretInput = -not [string]::IsNullOrWhiteSpace($RoComApiKey) `
+        -or -not [string]::IsNullOrWhiteSpace($ServerChanSendkey) `
+        -or -not [string]::IsNullOrWhiteSpace($TriggerToken)
+
+    if (-not $NonInteractive) {
+        Write-Host ""
+        Write-Host "Cloudflare Worker interactive deployment" -ForegroundColor Green
+        Write-Host "This script deploys cf-workers with Wrangler and verifies the root health endpoint."
+        if (-not $SkipChecks) {
+            if (-not (Read-YesNo "Run tests and checks before deploy?" $true)) {
+                $SkipChecks = $true
+            }
+        }
+        if (-not $DryRun -and -not $ConfigureSecrets -and -not $HasSecretInput) {
+            if (Read-YesNo "Configure Worker secrets now?" $true) {
+                $ConfigureSecrets = $true
+            }
+        }
+    }
+
     if (-not $DryRun) {
         if (-not [string]::IsNullOrWhiteSpace($CloudflareApiToken)) {
             $env:CLOUDFLARE_API_TOKEN = $CloudflareApiToken.Trim()
             $TokenWasSetByScript = $true
         }
         elseif ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)) {
+            if ($NonInteractive) {
+                throw "CLOUDFLARE_API_TOKEN is required in non-interactive mode."
+            }
             $env:CLOUDFLARE_API_TOKEN = Read-SecretText "Cloudflare API token"
             $TokenWasSetByScript = $true
         }
@@ -133,29 +179,27 @@ try {
             Invoke-External "npm" @("run", "check:worker")
         }
 
-        if ($DryRun -and (
-            $ConfigureSecrets `
-            -or -not [string]::IsNullOrWhiteSpace($RoComApiKey) `
-            -or -not [string]::IsNullOrWhiteSpace($ServerChanSendkey) `
-            -or -not [string]::IsNullOrWhiteSpace($TriggerToken)
-        )) {
+        if ($DryRun -and ($ConfigureSecrets -or $HasSecretInput)) {
             Write-Host "Dry run skips Worker secret configuration." -ForegroundColor Yellow
         }
 
-        $ShouldConfigureSecrets = -not $DryRun -and ($ConfigureSecrets `
-            -or -not [string]::IsNullOrWhiteSpace($RoComApiKey) `
-            -or -not [string]::IsNullOrWhiteSpace($ServerChanSendkey) `
-            -or -not [string]::IsNullOrWhiteSpace($TriggerToken))
-
+        $ShouldConfigureSecrets = -not $DryRun -and ($ConfigureSecrets -or $HasSecretInput)
         if ($ShouldConfigureSecrets) {
             if ([string]::IsNullOrWhiteSpace($RoComApiKey) -and $ConfigureSecrets) {
+                if ($NonInteractive) {
+                    throw "ROCOM_API_KEY is required when -ConfigureSecrets is used in non-interactive mode."
+                }
                 $RoComApiKey = Read-SecretText "ROCOM_API_KEY"
             }
             if ([string]::IsNullOrWhiteSpace($ServerChanSendkey) -and $ConfigureSecrets) {
-                $ServerChanSendkey = Read-SecretText "SERVERCHAN_SENDKEY (empty to skip)" -Optional
+                if (-not $NonInteractive) {
+                    $ServerChanSendkey = Read-SecretText "SERVERCHAN_SENDKEY (empty to skip)" -Optional
+                }
             }
             if ([string]::IsNullOrWhiteSpace($TriggerToken) -and $ConfigureSecrets) {
-                $TriggerToken = Read-SecretText "TRIGGER_TOKEN (empty to skip)" -Optional
+                if (-not $NonInteractive) {
+                    $TriggerToken = Read-SecretText "TRIGGER_TOKEN (empty to skip)" -Optional
+                }
             }
 
             Set-WorkerSecret "ROCOM_API_KEY" $RoComApiKey
