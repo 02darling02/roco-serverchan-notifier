@@ -247,7 +247,14 @@ npm run deploy
 
 **方式 D：一键脚本部署（交互式脚本 + API Token）**
 
-这是对方式 C 的封装，也是本仓库实际验证过的 Wrangler 项目部署路径。脚本默认交互式运行，会询问是否运行检查、是否配置 secrets；随后自动进入 `cf-workers`，执行 `npm ci`、Worker 单测、TypeScript 检查、`_worker.js` 同步检查、可选写入 secrets、`wrangler deploy`，最后访问根路径 `/` 做健康检查。
+这是对方式 C 的封装，也是本仓库实际验证过的 Wrangler 项目部署路径。脚本默认交互式运行，开局会先选择部署方式，再询问是否运行检查、是否配置 secrets，最后发布并访问根路径 `/` 做健康检查。
+
+部署方式：
+
+| 选项 | 说明 | 适合场景 |
+|------|------|----------|
+| `1` / `source` | **npx 编译/项目部署**：从 `src/index.ts` 构建，使用 `wrangler.toml` 发布 | 日常更新源码，推荐 |
+| `2` / `worker-js` | **_worker.js 直接部署**：直接发布仓库内现有 `cf-workers/_worker.js`，不重新生成 | 只想验证或发布控制台粘贴版产物 |
 
 准备项：
 
@@ -260,22 +267,24 @@ npm run deploy
 首次部署直接运行脚本，按提示输入敏感值：
 
 ```powershell
-# Windows PowerShell
+# Windows PowerShell，默认交互式
 .\scripts\deploy-cf-worker.ps1
 ```
 
 ```bash
-# Linux / macOS
+# Linux / macOS，默认交互式
 bash scripts/deploy-cf-worker.sh
 ```
 
-脚本会隐藏提示输入 `CLOUDFLARE_API_TOKEN`。选择配置 secrets 后，会依次提示输入 `ROCOM_API_KEY`、`SERVERCHAN_SENDKEY` 和可选 `TRIGGER_TOKEN`，并通过 `wrangler secret put` 写入 Cloudflare，不会写入仓库文件。
+脚本会隐藏提示输入 `CLOUDFLARE_API_TOKEN`。选择配置 secrets 后，会依次提示输入 `ROCOM_API_KEY`、`SERVERCHAN_SENDKEY` 和可选 `TRIGGER_TOKEN`，并通过 `wrangler secret put` 写入 Cloudflare，不会写入仓库文件。交互模式还允许临时修改 Worker 名称；默认仍读取 `cf-workers/wrangler.toml`。
+
+Windows PowerShell 脚本在默认交互式模式结束时会提示“按回车键退出”，避免从资源管理器或右键运行时窗口一闪而过；已在终端里运行且不想等待时可加 `-NoPause`。
 
 需要自动化时，可使用非交互模式：
 
 ```powershell
 $env:CLOUDFLARE_API_TOKEN = "你的Cloudflare API Token"
-.\scripts\deploy-cf-worker.ps1 -NonInteractive -ConfigureSecrets `
+.\scripts\deploy-cf-worker.ps1 -NonInteractive -DeployMode Source -ConfigureSecrets `
   -RoComApiKey "你的ROCOM_API_KEY" `
   -ServerChanSendkey "你的Server酱SendKey"
 Remove-Item Env:CLOUDFLARE_API_TOKEN
@@ -283,10 +292,20 @@ Remove-Item Env:CLOUDFLARE_API_TOKEN
 
 ```bash
 export CLOUDFLARE_API_TOKEN="你的Cloudflare API Token"
-bash scripts/deploy-cf-worker.sh --non-interactive --configure-secrets \
+bash scripts/deploy-cf-worker.sh --non-interactive --mode source --configure-secrets \
   --rocom-api-key "你的ROCOM_API_KEY" \
   --serverchan-sendkey "你的Server酱SendKey"
 unset CLOUDFLARE_API_TOKEN
+```
+
+直接部署现有 `_worker.js`：
+
+```powershell
+.\scripts\deploy-cf-worker.ps1 -NonInteractive -DeployMode WorkerJs
+```
+
+```bash
+bash scripts/deploy-cf-worker.sh --non-interactive --mode worker-js
 ```
 
 后续更新代码时不需要重新配置 secrets：
@@ -304,11 +323,13 @@ bash scripts/deploy-cf-worker.sh
 只想验证本机能否构建但不发布：
 
 ```powershell
-.\scripts\deploy-cf-worker.ps1 -DryRun -NonInteractive
+.\scripts\deploy-cf-worker.ps1 -DryRun -NonInteractive -DeployMode Source
+.\scripts\deploy-cf-worker.ps1 -DryRun -NonInteractive -DeployMode WorkerJs
 ```
 
 ```bash
-bash scripts/deploy-cf-worker.sh --dry-run --non-interactive
+bash scripts/deploy-cf-worker.sh --dry-run --non-interactive --mode source
+bash scripts/deploy-cf-worker.sh --dry-run --non-interactive --mode worker-js
 ```
 
 API Token 用完建议从当前 shell 清理；如果曾经把 token 发到聊天、issue、日志或截图里，应立即在 Cloudflare 撤销并重新生成。
@@ -737,7 +758,7 @@ npm run tail
 **一键脚本常用命令：**
 
 ```powershell
-# Windows 首次部署：默认交互式，提示输入 Cloudflare API Token 和 secrets
+# Windows 首次部署：默认交互式，先选择 npx 编译/项目部署或 _worker.js 直接部署
 .\scripts\deploy-cf-worker.ps1
 
 # 后续更新：保留 Cloudflare 上已有 secrets，只重新测试并发布代码
@@ -745,11 +766,12 @@ git pull
 .\scripts\deploy-cf-worker.ps1
 
 # 仅构建验证，不发布
-.\scripts\deploy-cf-worker.ps1 -DryRun -NonInteractive
+.\scripts\deploy-cf-worker.ps1 -DryRun -NonInteractive -DeployMode Source
+.\scripts\deploy-cf-worker.ps1 -DryRun -NonInteractive -DeployMode WorkerJs
 ```
 
 ```bash
-# Linux / macOS 首次部署：默认交互式，提示输入 Cloudflare API Token 和 secrets
+# Linux / macOS 首次部署：默认交互式，先选择 npx 编译/项目部署或 _worker.js 直接部署
 bash scripts/deploy-cf-worker.sh
 
 # 后续更新
@@ -757,7 +779,8 @@ git pull
 bash scripts/deploy-cf-worker.sh
 
 # 仅构建验证，不发布
-bash scripts/deploy-cf-worker.sh --dry-run --non-interactive
+bash scripts/deploy-cf-worker.sh --dry-run --non-interactive --mode source
+bash scripts/deploy-cf-worker.sh --dry-run --non-interactive --mode worker-js
 ```
 
 **自定义域名（可选）：**
