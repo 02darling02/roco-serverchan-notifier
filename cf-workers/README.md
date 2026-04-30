@@ -1,6 +1,6 @@
 # roco-push-worker
 
-[![Deploy to Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-F6821F?logo=cloudflare&logoColor=white)](https://dash.cloudflare.com/)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fadrian803%2Froco-push-console%2Ftree%2Fmain%2Fcf-workers)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](../LICENSE)
 
@@ -72,14 +72,28 @@
 - [Cloudflare 账号](https://dash.cloudflare.com/)（免费即可）
 - 已获取 `ROCOM_API_KEY`（参考 [数据源项目](https://github.com/Entropy-Increase-Team/)）
 
-### 安装
+### 方式一：Deploy Button
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fadrian803%2Froco-push-console%2Ftree%2Fmain%2Fcf-workers)
+
+Deploy Button 会把 `cf-workers/` 子目录作为 Worker 项目根目录，并通过 Workers Builds 部署。部署流程中按提示填写：
+
+- `ROCOM_API_KEY`（必需）
+- 至少一个推送通道 secret，例如 `SERVERCHAN_SENDKEY`
+- 可选的 `TRIGGER_TOKEN`
+
+如果部署时跳过了 secret，可以部署后在 Cloudflare Dashboard 的 Worker Settings 中补充，或在本地执行 `npx wrangler secret put <NAME>`。
+
+### 方式二：命令行部署
+
+#### 安装
 
 ```bash
 cd cf-workers
 npm install
 ```
 
-### 配置 Secrets
+#### 配置 Secrets
 
 ```bash
 # 1. 数据源 Key（必需）
@@ -95,7 +109,7 @@ npx wrangler secret put NTFY_TOPIC            # ntfy
 npx wrangler secret put GOTIFY_APP_TOKEN      # Gotify
 ```
 
-### 部署
+#### 部署
 
 ```bash
 npm run deploy
@@ -105,7 +119,7 @@ npm run deploy
 
 ## 部署指南
 
-### 完整部署流程
+### 完整命令行部署流程
 
 ```bash
 # 1. 登录 Cloudflare（首次使用）

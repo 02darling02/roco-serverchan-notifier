@@ -2,7 +2,7 @@
 
 [![Docker Image](https://img.shields.io/badge/docker-linxi5013%2Froco--push--console-2496ed?logo=docker&logoColor=white)](https://hub.docker.com/r/linxi5013/roco-push-console)
 [![CI](https://github.com/adrian803/roco-push-console/actions/workflows/ci.yml/badge.svg)](https://github.com/adrian803/roco-push-console/actions/workflows/ci.yml)
-[![Deploy to Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-F6821F?logo=cloudflare&logoColor=white)](cf-workers/)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fadrian803%2Froco-push-console%2Ftree%2Fmain%2Fcf-workers)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -173,7 +173,15 @@ WEB_PORT=19892
 
 ### 方式四：Cloudflare Workers
 
-不需要服务器，使用 Cloudflare 免费 Cron Triggers 定时执行。一条命令部署，全球 300+ 边缘节点运行。
+不需要服务器，使用 Cloudflare 免费 Cron Triggers 定时执行，全球边缘节点运行。
+
+**一键部署：**
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fadrian803%2Froco-push-console%2Ftree%2Fmain%2Fcf-workers)
+
+Deploy Button 会使用 `cf-workers/` 子目录作为 Worker 项目根目录。部署流程中按提示填写 `ROCOM_API_KEY` 和至少一个推送通道 secret；如果部署时跳过，也可以部署后在 Cloudflare Dashboard 或用 `wrangler secret put` 补充。
+
+**命令行部署：**
 
 ```bash
 cd cf-workers
@@ -395,6 +403,8 @@ npm run deploy
 ## Cloudflare Workers 详细说明
 
 CF Workers 版是本项目的第三种部署方式，将核心推送逻辑移植为 TypeScript Worker，使用 Cloudflare Cron Triggers 定时执行。
+
+推荐直接点击官方 Deploy Button；需要完全掌控账号登录、secrets 写入和部署日志时，再使用 `wrangler` 命令行部署。
 
 **架构：**
 
