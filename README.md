@@ -2,10 +2,11 @@
 
 [![Docker Image](https://img.shields.io/badge/docker-linxi5013%2Froco--push--console-2496ed?logo=docker&logoColor=white)](https://hub.docker.com/r/linxi5013/roco-push-console)
 [![CI](https://github.com/adrian803/roco-push-console/actions/workflows/ci.yml/badge.svg)](https://github.com/adrian803/roco-push-console/actions/workflows/ci.yml)
+[![Deploy to Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-F6821F?logo=cloudflare&logoColor=white)](cf-workers/)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-监控《洛克王国世界》远行商人刷新状态的 Docker 常驻服务。提供 Web 控制台管理配置，也支持只填 Key 后自动进入无控制台托管模式，将刷新结果推送到 10 种主流推送通道。
+监控《洛克王国世界》远行商人刷新状态的推送服务。提供 **Docker 部署**（含 Web 控制台）、**GitHub Actions 定时推送**和 **Cloudflare Workers 免费托管**三种方式，将刷新结果推送到 10 种主流推送通道。
 
 推送内容以文字和 Markdown 为主，不内置图片渲染和图片推送逻辑。
 
@@ -13,10 +14,12 @@
 
 - [截图](#截图)
 - [功能特性](#功能特性)
+- [部署方式选择](#部署方式选择)
 - [快速开始](#快速开始)
   - [方式一：只填 Key 自动托管](#方式一只填-key-自动托管)
   - [方式二：Docker Hub 镜像 + Web 控制台](#方式二docker-hub-镜像--web-控制台)
   - [方式三：docker compose](#方式三docker-compose)
+  - [方式四：Cloudflare Workers](#方式四cloudflare-workers)
 - [首次配置](#首次配置)
 - [推送通道](#推送通道)
 - [发送策略](#发送策略)
@@ -24,6 +27,7 @@
 - [常用命令](#常用命令)
 - [本地开发](#本地开发)
 - [GitHub Actions 定时推送](#github-actions-定时推送)
+- [Cloudflare Workers 详细说明](#cloudflare-workers-详细说明)
 - [常见问题](#常见问题)
 - [安全提醒](#安全提醒)
 - [来源与鸣谢](#来源与鸣谢)
@@ -44,12 +48,12 @@ Server 酱推送效果：
 
 **核心能力**
 
-- Docker 常驻运行，Web 控制台默认端口 `19892`
-- 支持自动托管模式 — 配齐 `ROCOM_API_KEY` 和任一推送通道 Key 后不启动 Web UI
+- 10 种推送通道：Server 酱、PushPlus、企业微信、WxPusher、Bark、钉钉、飞书、ntfy、Gotify
 - 默认定时 `08:05,12:05,16:05,20:05` 推送（远行商人刷新后 5 分钟，给数据源留同步时间）
 - 支持多通道同时发送、单通道发送、主备失败切换
+- 三种部署方式：Docker / GitHub Actions / Cloudflare Workers
 
-**Web 控制台**
+**Web 控制台**（Docker 版）
 
 - 页面管理配置，无需反复改环境变量
 - 单通道测试和按当前策略测试
@@ -58,9 +62,27 @@ Server 酱推送效果：
 
 **可靠性**
 
-- 配置持久化到 `./data/config.json`
+- 配置持久化到 `./data/config.json`（Docker 版）
 - 读取损坏配置时自动备份原文件，不会覆盖旧配置
 - 容器启动时自动修正 `/data` 目录权限，适配 WSL / bind mount
+
+## 部署方式选择
+
+| | Docker | GitHub Actions | Cloudflare Workers |
+|---|:---:|:---:|:---:|
+| **需要服务器** | 是 | 否 | 否 |
+| **Web 控制台** | 有 | 无 | 无 |
+| **费用** | 服务器费用 | 免费 | 免费 |
+| **定时精确度** | 精确到秒 | 延迟几分钟 | 延迟 1-2 分钟 |
+| **长期稳定性** | 高 | 中（可能被暂停） | 高 |
+| **配置方式** | 页面 / 环境变量 | GitHub Secrets | Wrangler Secrets |
+| **适合场景** | 长期运行、需要 Web 管理 | 偶尔使用、不想运维 | 免费长期托管 |
+
+**推荐：**
+
+- 需要 Web 控制台 → **Docker**
+- 想要免费且稳定 → **Cloudflare Workers**
+- 已有 GitHub 仓库、偶尔用用 → **GitHub Actions**
 
 ## 快速开始
 
@@ -149,7 +171,33 @@ WEB_PORT=19892
 | `scheduler` | 强制无控制台运行 |
 | `once` | 执行一次检查后退出 |
 
+### 方式四：Cloudflare Workers
+
+不需要服务器，使用 Cloudflare 免费 Cron Triggers 定时执行。一条命令部署，全球 300+ 边缘节点运行。
+
+```bash
+cd cf-workers
+npm install
+
+# 配置 secrets
+npx wrangler secret put ROCOM_API_KEY
+npx wrangler secret put SERVERCHAN_SENDKEY  # 至少一个推送通道
+
+# 部署
+npm run deploy
+```
+
+部署后自动按 cron 调度运行（北京时间 08:05 / 12:05 / 16:05 / 20:05）。也可以手动触发：
+
+```bash
+curl https://roco-push-worker.<子域>.workers.dev/trigger
+```
+
+详细说明见 [cf-workers/README.md](cf-workers/README.md)。
+
 ## 首次配置
+
+### Docker 版（Web 控制台）
 
 进入控制台后按此顺序操作：
 
@@ -163,7 +211,13 @@ WEB_PORT=19892
 
 配置保存到 `./data/config.json`。
 
+### CF Workers 版（环境变量）
+
+通过 `wrangler secret put` 配置 secrets，通过 `wrangler.toml` 配置非敏感变量。详见 [cf-workers/README.md](cf-workers/README.md#环境变量参考)。
+
 ## 推送通道
+
+10 种推送通道，Docker 版和 CF Workers 版完全一致：
 
 | 通道 | 必填配置 | 说明 |
 |------|---------|------|
@@ -178,7 +232,7 @@ WEB_PORT=19892
 | ntfy | Base URL、Topic | 可选 bearer token、priority、tags |
 | Gotify | Base URL、App Token | 可配置 priority |
 
-**通道卡片说明：**
+**Docker 版通道卡片说明：**
 
 - **名称**：给自己看的显示名，比如"我的 Server 酱"
 - **启用**：关闭后该通道不参与发送
@@ -188,11 +242,15 @@ WEB_PORT=19892
 
 ## 发送策略
 
-| 策略 | 行为 |
-|------|------|
-| 所有启用通道同时发送 | 向全部启用通道发送，至少一个成功即认为送达 |
-| 只发送选中通道 | 只向下拉框选中的通道发送 |
-| 主备切换，成功即停 | 按通道列表顺序尝试，第一个成功后停止 |
+通过 `DELIVERY_MODE` 控制（Docker 版在 Web 控制台选择，CF Workers 版在 `wrangler.toml` 设置）：
+
+| 策略 | 值 | 行为 |
+|------|---|------|
+| 所有启用通道同时发送 | `all` | 向全部启用通道发送，至少一个成功即认为送达 |
+| 只发送选中通道 | `single` | 只向选中的通道发送 |
+| 主备切换，成功即停 | `failover` | 按通道列表顺序尝试，第一个成功后停止 |
+
+CF Workers 版可通过 `SELECTED_PROVIDER` 指定 `single` 的通道，通过 `FAILOVER_ORDER` 指定 `failover` 的逗号分隔顺序。可用通道 ID 见 [cf-workers/README.md](cf-workers/README.md#发送策略)。
 
 ## 环境变量
 
@@ -233,6 +291,8 @@ WEB_PORT=19892
 | ntfy | `NTFY_TOPIC` | `NTFY_BASE_URL`、`NTFY_TOKEN`、`NTFY_PRIORITY`、`NTFY_TAGS` |
 | Gotify | `GOTIFY_BASE_URL`、`GOTIFY_APP_TOKEN` | `GOTIFY_PRIORITY` |
 
+> CF Workers 版的环境变量略有不同，详见 [cf-workers/README.md](cf-workers/README.md#环境变量参考)。
+
 ## 常用命令
 
 ```bash
@@ -254,6 +314,8 @@ cp ./data/config.json ./config.backup.json
 
 ## 本地开发
 
+### Docker 版（Python）
+
 ```bash
 # 环境准备
 uv sync --frozen
@@ -274,6 +336,30 @@ docker compose config --quiet
 
 # 构建镜像
 docker build -t roco-push-console:latest .
+```
+
+### CF Workers 版（TypeScript）
+
+```bash
+cd cf-workers
+npm install
+
+# 复制 secrets 模板
+cp .dev.vars.example .dev.vars
+# 编辑 .dev.vars 填入你的 secrets
+
+# 本地开发
+npm run dev
+# 访问 http://localhost:8787/health
+# 手动触发 http://localhost:8787/trigger
+
+# 测试和类型检查
+npm test
+npx tsc --noEmit
+npx wrangler deploy --dry-run --outdir dist
+
+# 部署
+npm run deploy
 ```
 
 ## GitHub Actions 定时推送
@@ -299,14 +385,71 @@ docker build -t roco-push-console:latest .
 
 可选添加 Repository Variable：`PUSHPLUS_TOKEN`、`DELIVERY_MODE`、`NOTIFY_EMPTY`、`HTTP_TIMEOUT` 等。
 
-> **注意：** GitHub Actions 定时任务不是严格实时，可能延迟几分钟；只在默认分支生效，仓库长期无活动可能被暂停。稳定运行仍建议 Docker 常驻托管。
+> **注意：** GitHub Actions 定时任务不是严格实时，可能延迟几分钟；只在默认分支生效，仓库长期无活动可能被暂停。如果需要更稳定的免费方案，推荐使用 [Cloudflare Workers](#方式四cloudflare-workers)。
 
 **其他 Actions 工作流：**
 
 - `ci.yml` — PR 和 push 时运行测试 + 编译检查
 - `docker-publish.yml` — 自动构建并发布多架构镜像（`amd64` / `arm64`）到 Docker Hub
 
+## Cloudflare Workers 详细说明
+
+CF Workers 版是本项目的第三种部署方式，将核心推送逻辑移植为 TypeScript Worker，使用 Cloudflare Cron Triggers 定时执行。
+
+**架构：**
+
+```
+Cron Trigger → fetchMerchantData → processMerchantData → sendDelivery
+(每天4次)       (获取数据)           (过滤+构建消息)       (推送到10种通道)
+```
+
+**文件结构：**
+
+```
+cf-workers/
+├── wrangler.toml          # Cron 触发 + 非敏感变量
+├── src/
+│   ├── index.ts           # 入口：scheduled + fetch handler
+│   ├── types.ts           # 接口定义
+│   ├── config.ts          # 环境变量 → Config
+│   ├── rocom.ts           # API 客户端 + 时间工具
+│   ├── push.ts            # 10 个推送通道
+│   └── provider-specs.ts  # 通道规格定义
+└── README.md
+```
+
+**HTTP 端点：**
+
+| 路径 | 说明 |
+|------|------|
+| `/health` | 健康检查 |
+| `/trigger` | 手动触发一次推送 |
+
+`/trigger` 默认保持开放；如需限制访问，配置 `TRIGGER_TOKEN` secret 后，请用 `?token=`、`X-Trigger-Token` 或 `Authorization: Bearer` 传入 token。
+
+**费用：** 默认每天 4 次触发 = 每月约 120 次，请求量很低，通常适合 Cloudflare Workers 免费计划。具体额度以 [Cloudflare Workers Limits](https://developers.cloudflare.com/workers/platform/limits/) 为准。
+
+完整说明见 [cf-workers/README.md](cf-workers/README.md)。
+
 ## 常见问题
+
+<details>
+<summary><b>如何获取 ROCOM_API_KEY？</b></summary>
+
+请按 [Entropy-Increase-Team](https://github.com/Entropy-Increase-Team/) 项目或相关社区的规则获取。本项目不提供、不分发 API Key。
+
+</details>
+
+<details>
+<summary><b>三种部署方式怎么选？</b></summary>
+
+- 需要 Web 控制台管理配置 → **Docker**
+- 想免费且稳定运行 → **Cloudflare Workers**
+- 已有 GitHub 仓库、偶尔用 → **GitHub Actions**
+
+三种方式的推送逻辑完全一致，区别在于配置方式和运维成本。
+
+</details>
 
 <details>
 <summary><b>为什么打开控制台不需要密码？</b></summary>
@@ -339,7 +482,11 @@ docker build -t roco-push-console:latest .
 <details>
 <summary><b>为什么收不到推送？</b></summary>
 
-先在"通道配置"里点击单通道"测试"。如果测试失败，检查 token / webhook 是否正确、服务商是否限流、服务器是否能访问对应推送服务。
+**Docker 版：** 先在"通道配置"里点击单通道"测试"。如果测试失败，检查 token / webhook 是否正确、服务商是否限流、服务器是否能访问对应推送服务。
+
+**CF Workers 版：** 手动触发 `curl <worker-url>/trigger`，查看返回结果。若配置了 `TRIGGER_TOKEN`，使用 `curl '<worker-url>/trigger?token=你的token'`。或运行 `npm run tail` 查看实时日志。
+
+**GitHub Actions 版：** 查看 Actions 运行日志，确认 secrets 是否配置正确。
 
 </details>
 
@@ -367,7 +514,26 @@ docker compose pull && docker compose up -d --force-recreate
 
 </details>
 
+<details>
+<summary><b>GitHub Actions 定时不准怎么办？</b></summary>
+
+GitHub Actions 的 cron 不保证精确执行，可能延迟几分钟，仓库长期不活跃还会被暂停。推荐迁移到 [Cloudflare Workers](#方式四cloudflare-workers)，同样免费但更稳定。
+
+</details>
+
+<details>
+<summary><b>如何从 GitHub Actions 迁移到 CF Workers？</b></summary>
+
+1. 将 GitHub Secrets 中的值迁移到 `wrangler secret put`
+2. 部署 Worker：`cd cf-workers && npm run deploy`
+3. 删除仓库中的 `.github/workflows/scheduled-push.yml`
+4. CI 和 Docker Publish workflows 保留不变
+
+</details>
+
 ## 安全提醒
+
+### Docker 版
 
 默认 `APP_MODE=auto`：配置齐时容器只启动调度器，不启动 Web 控制台；缺少配置时才启动控制台方便首次配置。
 
@@ -379,6 +545,10 @@ docker compose pull && docker compose up -d --force-recreate
 - 只在可信网络开放 `19892`，或用防火墙 / 反向代理限制访问
 - 本机访问改为 `127.0.0.1:${WEB_PORT:-19892}:19892`
 - 不要提交 `./data/config.json`（含明文 token 和 Key）
+
+### CF Workers 版
+
+Secrets 通过 `wrangler secret put` 加密存储，不会出现在代码或日志中。`/trigger` 端点默认开放；公开分享 Worker URL 前建议配置 `TRIGGER_TOKEN`，让手动触发必须带 token。
 
 ## 来源与鸣谢
 
@@ -394,22 +564,30 @@ docker compose pull && docker compose up -d --force-recreate
 
 - 新推送通道
 - 控制台交互优化
-- Docker 部署文档
+- 部署文档
 - 测试用例
 
 提交 PR 前请运行：
 
 ```bash
+# Docker 版
 uv run python -m unittest discover -s tests
 uv run python -m compileall -q src main.py tests
 docker compose config --quiet
+
+# CF Workers 版
+cd cf-workers
+npm ci
+npm test
+npx tsc --noEmit
+npx wrangler deploy --dry-run --outdir dist
 ```
 
 ## 路线图
 
 - 支持更多推送平台
-- 增加 Cloudflare Workers Cron 适配器
 - 增加更完整的端到端测试
+- ~~Cloudflare Workers Cron 适配器~~ ✅ 已完成
 
 ## 免责声明
 

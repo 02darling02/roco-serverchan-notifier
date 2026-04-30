@@ -1,0 +1,30 @@
+name = "roco-push-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# Beijing 08:05, 12:05, 16:05, 20:05 = UTC 00:05, 04:05, 08:05, 12:05
+[triggers]
+crons = ["5 0,4,8,12 * * *"]
+
+[vars]
+ROCOM_API_URL = "https://wegame.shallow.ink/api/v1/games/rocom/merchant/info?refresh=true"
+NOTIFY_EMPTY = "false"
+DELIVERY_MODE = "all"
+HTTP_TIMEOUT = "30"
+# Uncomment and set as needed:
+# SELECTED_PROVIDER = "serverchan-default"
+# FAILOVER_ORDER = "serverchan-default,pushplus-env"
+# TRIGGER_TOKEN is a secret. Set it with:
+# npx wrangler secret put TRIGGER_TOKEN
+# WECOM_TOUSER = "@all"
+# BARK_SERVER_URL = "https://api.day.app"
+# BARK_GROUP = "洛克王国"
+# NTFY_BASE_URL = "https://ntfy.sh"
+# NTFY_PRIORITY = "default"
+# GOTIFY_BASE_URL = "https://gotify.example.com"
+# GOTIFY_PRIORITY = "5"
+# PUSHPLUS_TOPIC = ""
+# PUSHPLUS_CHANNEL = ""
+# WXPUSHER_UIDS = ""
+# WXPUSHER_TOPIC_IDS = ""
+# NTFY_TAGS = ""

@@ -41,3 +41,26 @@ jobs:
 
       - name: Validate Docker Compose config
         run: docker compose config --quiet
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cf-workers/package-lock.json
+
+      - name: Install CF Worker dependencies
+        working-directory: cf-workers
+        run: npm ci
+
+      - name: Run CF Worker tests
+        working-directory: cf-workers
+        run: npm test
+
+      - name: Type-check CF Worker
+        working-directory: cf-workers
+        run: npx tsc --noEmit
+
+      - name: Validate CF Worker bundle
+        working-directory: cf-workers
+        run: npx wrangler deploy --dry-run --outdir dist
