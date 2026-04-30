@@ -1014,6 +1014,10 @@ function isTriggerAuthorized(request, env) {
   return triggerTokenFromRequest(request) === expected;
 }
 __name(isTriggerAuthorized, "isTriggerAuthorized");
+function healthResponse() {
+  return Response.json({ ok: true, timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+}
+__name(healthResponse, "healthResponse");
 async function runPipeline(env) {
   const config = loadConfig(env);
   const missing = missingRequired(config);
@@ -1077,8 +1081,8 @@ var index_default = {
   // HTTP handler (manual trigger + health check)
   async fetch(request, env, _ctx) {
     const url = new URL(request.url);
-    if (url.pathname === "/health") {
-      return Response.json({ ok: true, timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+    if (url.pathname === "/" || url.pathname === "/health") {
+      return healthResponse();
     }
     if (url.pathname === "/trigger") {
       if (!isTriggerAuthorized(request, env)) {

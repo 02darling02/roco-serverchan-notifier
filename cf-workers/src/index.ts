@@ -25,6 +25,10 @@ function isTriggerAuthorized(request: Request, env: Env): boolean {
   return triggerTokenFromRequest(request) === expected;
 }
 
+function healthResponse(): Response {
+  return Response.json({ ok: true, timestamp: new Date().toISOString() });
+}
+
 async function runPipeline(env: Env): Promise<PipelineResult> {
   const config = loadConfig(env);
 
@@ -106,8 +110,8 @@ export default {
   ): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/health") {
-      return Response.json({ ok: true, timestamp: new Date().toISOString() });
+    if (url.pathname === "/" || url.pathname === "/health") {
+      return healthResponse();
     }
 
     if (url.pathname === "/trigger") {

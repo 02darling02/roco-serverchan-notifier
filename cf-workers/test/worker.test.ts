@@ -92,6 +92,13 @@ const message: NotificationMessage = {
   markdown: "测试 Markdown",
 };
 
+async function assertHealthResponse(response: Response): Promise<void> {
+  assert.equal(response.status, 200);
+  const payload = (await response.json()) as { ok?: boolean; timestamp?: string };
+  assert.equal(payload.ok, true);
+  assert.equal(typeof payload.timestamp, "string");
+}
+
 test("processMerchantData filters by real epoch time in UTC environments", () => {
   withFakeNow("2026-04-26T00:05:00Z", () => {
     const processed = processMerchantData({
@@ -125,6 +132,37 @@ test("_worker.js exports a pasteable worker module", async () => {
 
   assert.equal(typeof pasteWorker.fetch, "function");
   assert.equal(typeof pasteWorker.scheduled, "function");
+});
+
+test("root path and /health both return health status", async () => {
+  const bindings = env();
+
+  await assertHealthResponse(
+    await worker.fetch(
+      new Request("https://worker.example/"),
+      bindings,
+      {} as ExecutionContext
+    )
+  );
+  await assertHealthResponse(
+    await worker.fetch(
+      new Request("https://worker.example/health"),
+      bindings,
+      {} as ExecutionContext
+    )
+  );
+});
+
+test("_worker.js root path returns health status", async () => {
+  const pasteWorker = (await import("../_worker.js")).default;
+
+  await assertHealthResponse(
+    await pasteWorker.fetch(
+      new Request("https://worker.example/"),
+      env(),
+      {} as ExecutionContext
+    )
+  );
 });
 
 test("delivery preserves non-json HTTP error bodies without reading the body twice", async () => {
