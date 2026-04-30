@@ -32,8 +32,23 @@ class CloudflareDeployScriptDocsTests(unittest.TestCase):
         self.assertIn("https://$WorkerHost/", content)
         self.assertIn("[AllowEmptyString()]", content)
         self.assertIn("NoPause", content)
+        self.assertIn("ROCO_DEPLOY_PERSISTENT_WINDOW", content)
+        self.assertIn("Start-PersistentConsoleIfNeeded", content)
         self.assertIn("执行结束，按回车键退出", content)
         self.assertIn("Remove-Item Env:CLOUDFLARE_API_TOKEN", content)
+        self.assertTrue(script.read_bytes().startswith(b"\xef\xbb\xbf"))
+
+    def test_windows_cmd_launcher_keeps_explorer_window_open(self):
+        script = ROOT / "scripts" / "deploy-cf-worker.cmd"
+        content = script.read_text(encoding="utf-8")
+
+        self.assertIn("deploy-cf-worker.ps1", content)
+        self.assertIn("ExecutionPolicy Bypass", content)
+        self.assertIn("ROCO_DEPLOY_PERSISTENT_WINDOW", content)
+        self.assertIn("-NoPause", content)
+        self.assertIn("ROCO_DEPLOY_CMD_NO_PAUSE", content)
+        self.assertIn("pause >nul", content)
+        self.assertIn(b"\r\n", script.read_bytes())
 
     def test_linux_deploy_script_contains_expected_safety_and_deploy_steps(self):
         script = ROOT / "scripts" / "deploy-cf-worker.sh"
@@ -65,8 +80,10 @@ class CloudflareDeployScriptDocsTests(unittest.TestCase):
 
         self.assertIn("一键脚本部署", readme)
         self.assertIn("scripts/deploy-cf-worker.ps1", readme)
+        self.assertIn("scripts/deploy-cf-worker.cmd", readme)
         self.assertIn("scripts/deploy-cf-worker.sh", readme)
         self.assertIn("默认交互式", readme)
+        self.assertIn("右键/双击", readme)
         self.assertIn("按回车键退出", readme)
         self.assertIn("npx 编译/项目部署", readme)
         self.assertIn("_worker.js 直接部署", readme)

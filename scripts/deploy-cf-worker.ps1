@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 [CmdletBinding()]
 param(
     [ValidateSet("", "Source", "WorkerJs")]
@@ -19,7 +19,59 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$ScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
+$ScriptDir = Split-Path -Parent $ScriptPath
+
+function Get-ParentProcessName {
+    try {
+        $process = Get-CimInstance Win32_Process -Filter "ProcessId = $PID"
+        if (-not $process) {
+            return ""
+        }
+        $parent = Get-CimInstance Win32_Process -Filter "ProcessId = $($process.ParentProcessId)"
+        if (-not $parent) {
+            return ""
+        }
+        return [System.IO.Path]::GetFileNameWithoutExtension($parent.Name).ToLowerInvariant()
+    }
+    catch {
+        return ""
+    }
+}
+
+function Start-PersistentConsoleIfNeeded {
+    if ($NonInteractive -or $NoPause -or $env:ROCO_DEPLOY_PERSISTENT_WINDOW -eq "1") {
+        return
+    }
+
+    $parentName = Get-ParentProcessName
+    if ($parentName -notin @("explorer", "openwith")) {
+        return
+    }
+
+    $powerShellExe = Join-Path $PSHOME "powershell.exe"
+    if (-not (Test-Path $powerShellExe)) {
+        $powerShellExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+    }
+    if (-not (Test-Path $powerShellExe)) {
+        $powerShellExe = "powershell.exe"
+    }
+    $workDir = Split-Path -Parent $ScriptDir
+    $command = "chcp 65001 >nul & `"$powerShellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -NoPause & echo. & echo 执行结束，按任意键关闭窗口... & pause >nul"
+
+    try {
+        $env:ROCO_DEPLOY_PERSISTENT_WINDOW = "1"
+        Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $command) -WorkingDirectory $workDir
+        exit 0
+    }
+    finally {
+        Remove-Item Env:ROCO_DEPLOY_PERSISTENT_WINDOW -ErrorAction SilentlyContinue
+    }
+}
+
+Start-PersistentConsoleIfNeeded
+
+$RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..")).Path
 $WorkerDir = Join-Path $RepoRoot "cf-workers"
 $WranglerToml = Join-Path $WorkerDir "wrangler.toml"
 $WorkerJsPath = Join-Path $WorkerDir "_worker.js"
