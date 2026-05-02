@@ -1,0 +1,121 @@
+{
+  "provider_specs": [
+    {
+      "type": "serverchan",
+      "secret_fields": ["sendkey"],
+      "required_fields": ["sendkey"]
+    },
+    {
+      "type": "pushplus",
+      "secret_fields": ["token"],
+      "required_fields": ["token"]
+    },
+    {
+      "type": "ntfy",
+      "secret_fields": ["topic", "token"],
+      "required_fields": ["base_url", "topic"]
+    }
+  ],
+  "price_markdown": {
+    "python_processed": {
+      "round_info": {"current": 3, "total": 4, "countdown": "3小时"},
+      "products": [
+        {
+          "name": "绝缘球",
+          "time_label": "08:00 - 23:59"
+        },
+        {
+          "name": "炫彩精灵蛋",
+          "time_label": "16:00 - 20:00",
+          "price": 1600000,
+          "buy_limit_num": 1
+        },
+        {
+          "name": "魔力果",
+          "time_label": "16:00 - 20:00",
+          "price": 6000,
+          "buy_limit_num": 20
+        }
+      ]
+    },
+    "worker_processed": {
+      "title": "远行商人",
+      "subtitle": "",
+      "productCount": 3,
+      "roundInfo": {"current": 3, "total": 4, "countdown": "3小时"},
+      "products": [
+        {
+          "name": "绝缘球",
+          "image": "",
+          "timeLabel": "08:00 - 23:59"
+        },
+        {
+          "name": "炫彩精灵蛋",
+          "image": "",
+          "timeLabel": "16:00 - 20:00",
+          "price": 1600000,
+          "buyLimitNum": 1
+        },
+        {
+          "name": "魔力果",
+          "image": "",
+          "timeLabel": "16:00 - 20:00",
+          "price": 6000,
+          "buyLimitNum": 20
+        }
+      ]
+    },
+    "expected_lines": [
+      "绝缘球（08:00 - 23:59）价格未收录",
+      "炫彩精灵蛋*1（16:00 - 20:00）单价1600000 合计1,600,000（160万洛克贝）",
+      "魔力果*20（16:00 - 20:00）单价6000 合计120,000（12万洛克贝）"
+    ]
+  },
+  "delivery_summary": {
+    "python_report": {
+      "success": true,
+      "mode": "all",
+      "results": [
+        {
+          "provider_id": "serverchan-default",
+          "provider_name": "Server 酱",
+          "provider_type": "serverchan",
+          "success": true,
+          "message": "ok",
+          "status_code": 200
+        },
+        {
+          "provider_id": "pushplus-env",
+          "provider_name": "PushPlus",
+          "provider_type": "pushplus",
+          "success": false,
+          "message": "fail",
+          "status_code": 500
+        }
+      ]
+    },
+    "worker_report": {
+      "success": true,
+      "mode": "all",
+      "results": [
+        {
+          "providerId": "serverchan-default",
+          "providerName": "Server 酱",
+          "providerType": "serverchan",
+          "success": true,
+          "message": "ok",
+          "statusCode": 200
+        },
+        {
+          "providerId": "pushplus-env",
+          "providerName": "PushPlus",
+          "providerType": "pushplus",
+          "success": false,
+          "message": "fail",
+          "statusCode": 500
+        }
+      ]
+    },
+    "expected": "1/2 个通道成功"
+  }
+}

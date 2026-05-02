@@ -151,6 +151,43 @@ test("processMerchantData enriches known goods price and buy limit", () => {
   });
 });
 
+test("processMerchantData enriches alias goods and preserves missing price", () => {
+  withFakeNow("2026-04-26T08:05:00Z", () => {
+    const processed = processMerchantData({
+      merchantActivities: [
+        {
+          name: "远行商人",
+          get_props: [
+            {
+              name: "绝缘球",
+              start_time: originalDate.parse("2026-04-26T08:00:00Z"),
+              end_time: originalDate.parse("2026-04-26T12:00:00Z"),
+            },
+            {
+              name: "炫彩精灵蛋",
+              start_time: originalDate.parse("2026-04-26T08:00:00Z"),
+              end_time: originalDate.parse("2026-04-26T12:00:00Z"),
+            },
+            {
+              name: "魔力果",
+              start_time: originalDate.parse("2026-04-26T08:00:00Z"),
+              end_time: originalDate.parse("2026-04-26T12:00:00Z"),
+            },
+          ],
+          get_pets: [],
+        },
+      ],
+    });
+
+    const products = new Map(processed.products.map((product) => [product.name, product]));
+    assert.equal(products.get("绝缘球")?.price, undefined);
+    assert.equal(products.get("炫彩精灵蛋")?.price, 1600000);
+    assert.equal(products.get("炫彩精灵蛋")?.buyLimitNum, 1);
+    assert.equal(products.get("魔力果")?.price, 6000);
+    assert.equal(products.get("魔力果")?.buyLimitNum, 20);
+  });
+});
+
 test("buildMerchantMarkdown can include price and quantity details", () => {
   const markdown = buildMerchantMarkdown(
     {
@@ -174,6 +211,49 @@ test("buildMerchantMarkdown can include price and quantity details", () => {
   assert.match(
     markdown,
     /黑晶琉璃\*100（16:00 - 20:00）单价1000 合计100,000（10万洛克贝）/
+  );
+});
+
+test("buildMerchantMarkdown marks missing prices and includes quantity one", () => {
+  const markdown = buildMerchantMarkdown(
+    {
+      title: "远行商人",
+      subtitle: "",
+      productCount: 3,
+      roundInfo: { current: 3, total: 4, countdown: "3小时" },
+      products: [
+        {
+          name: "绝缘球",
+          image: "",
+          timeLabel: "08:00 - 23:59",
+        },
+        {
+          name: "炫彩精灵蛋",
+          image: "",
+          timeLabel: "16:00 - 20:00",
+          price: 1600000,
+          buyLimitNum: 1,
+        },
+        {
+          name: "魔力果",
+          image: "",
+          timeLabel: "16:00 - 20:00",
+          price: 6000,
+          buyLimitNum: 20,
+        },
+      ],
+    },
+    true
+  );
+
+  assert.match(markdown, /绝缘球（08:00 - 23:59）价格未收录/);
+  assert.match(
+    markdown,
+    /炫彩精灵蛋\*1（16:00 - 20:00）单价1600000 合计1,600,000（160万洛克贝）/
+  );
+  assert.match(
+    markdown,
+    /魔力果\*20（16:00 - 20:00）单价6000 合计120,000（12万洛克贝）/
   );
 });
 

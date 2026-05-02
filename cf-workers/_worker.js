@@ -1200,8 +1200,25 @@ function toInt(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 __name(toInt, "toInt");
+function catalogNameCandidates(name) {
+  const normalized = name.trim();
+  const candidates = normalized ? [normalized] : [];
+  if (normalized.includes("\u7CBE\u7075\u86CB")) {
+    candidates.push(normalized.replaceAll("\u7CBE\u7075\u86CB", "\u86CB"));
+  }
+  return [...new Set(candidates)];
+}
+__name(catalogNameCandidates, "catalogNameCandidates");
+function priceInfoForName(name) {
+  for (const candidate of catalogNameCandidates(name)) {
+    const info = GOODS_PRICE_INFO_BY_NAME.get(candidate);
+    if (info) return info;
+  }
+  return void 0;
+}
+__name(priceInfoForName, "priceInfoForName");
 function enrichPriceInfo(product) {
-  const info = GOODS_PRICE_INFO_BY_NAME.get(product.name.trim());
+  const info = priceInfoForName(product.name);
   if (!info) return product;
   return { ...product, price: info.price, buyLimitNum: info.buyLimitNum };
 }
@@ -1256,6 +1273,9 @@ function productLine(product, includePriceInfo) {
     const total = product.price * product.buyLimitNum;
     return `${product.name}*${product.buyLimitNum}\uFF08${product.timeLabel}\uFF09\u5355\u4EF7${product.price} \u5408\u8BA1${total.toLocaleString("en-US")}\uFF08${formatLuokeBay(total)}\uFF09`;
   }
+  if (includePriceInfo) {
+    return `${product.name}\uFF08${product.timeLabel}\uFF09\u4EF7\u683C\u672A\u6536\u5F55`;
+  }
   return `${product.name}\uFF08${product.timeLabel}\uFF09`;
 }
 __name(productLine, "productLine");
@@ -1309,18 +1329,7 @@ async function fetchWithTimeout(url, init, timeoutSec) {
 }
 __name(fetchWithTimeout, "fetchWithTimeout");
 
-// src/push.ts
-function splitCsv(value) {
-  if (!value) return [];
-  return value.split(",").map((s) => s.trim()).filter(Boolean);
-}
-__name(splitCsv, "splitCsv");
-function missingRequired2(provider) {
-  return [...providerRequiredFields(provider.type)].filter(
-    (name) => !(provider.config[name] || "").trim()
-  );
-}
-__name(missingRequired2, "missingRequired");
+// src/push-redaction.ts
 var SENSITIVE_NAMES = "access_token|app_token|corpsecret|key|read_key|readkey|secret|sendkey|token|webhook";
 var SENSITIVE_QUERY_RE = new RegExp(
   `(\\b(?:${SENSITIVE_NAMES})=)([^&\\s]+)`,
@@ -1344,6 +1353,8 @@ function redactSensitiveText(provider, text) {
   return r;
 }
 __name(redactSensitiveText, "redactSensitiveText");
+
+// src/push-http.ts
 function jsonResult(payload, successCodes) {
   const code = payload.code ?? payload.errcode;
   let success = successCodes.has(code);
@@ -1389,6 +1400,17 @@ function resultFromParsedResponse(provider, resp, payload, text, successCodes) {
   };
 }
 __name(resultFromParsedResponse, "resultFromParsedResponse");
+function providerErrorResult(provider, err) {
+  return {
+    providerId: provider.id,
+    providerName: provider.name,
+    providerType: provider.type,
+    success: false,
+    message: redactSensitiveText(provider, String(err)),
+    statusCode: null
+  };
+}
+__name(providerErrorResult, "providerErrorResult");
 async function postJson(provider, url, payload, timeoutSec, options) {
   const successCodes = options?.successCodes ?? /* @__PURE__ */ new Set([0, "0"]);
   try {
@@ -1413,17 +1435,12 @@ async function postJson(provider, url, payload, timeoutSec, options) {
       successCodes
     );
   } catch (err) {
-    return {
-      providerId: provider.id,
-      providerName: provider.name,
-      providerType: provider.type,
-      success: false,
-      message: redactSensitiveText(provider, String(err)),
-      statusCode: null
-    };
+    return providerErrorResult(provider, err);
   }
 }
 __name(postJson, "postJson");
+
+// src/push-provider-auth.ts
 var wecomTokenCache = /* @__PURE__ */ new Map();
 async function getWecomToken(corpid, secret, timeoutSec) {
   const key = `${corpid}:${secret}`;
@@ -1489,6 +1506,19 @@ ${secret}`;
   return btoa(binary);
 }
 __name(feishuSign, "feishuSign");
+
+// src/push-providers.ts
+function splitCsv(value) {
+  if (!value) return [];
+  return value.split(",").map((s) => s.trim()).filter(Boolean);
+}
+__name(splitCsv, "splitCsv");
+function missingRequired2(provider) {
+  return [...providerRequiredFields(provider.type)].filter(
+    (name) => !(provider.config[name] || "").trim()
+  );
+}
+__name(missingRequired2, "missingRequired");
 async function sendServerChan(provider, message, timeoutSec) {
   const sendkey = provider.config.sendkey;
   const url = `https://sctapi.ftqq.com/${sendkey}.send`;
@@ -1506,14 +1536,7 @@ async function sendServerChan(provider, message, timeoutSec) {
     const { payload, text } = await readResponsePayload(resp);
     return resultFromParsedResponse(provider, resp, payload, text, successCodes);
   } catch (err) {
-    return {
-      providerId: provider.id,
-      providerName: provider.name,
-      providerType: provider.type,
-      success: false,
-      message: redactSensitiveText(provider, String(err)),
-      statusCode: null
-    };
+    return providerErrorResult(provider, err);
   }
 }
 __name(sendServerChan, "sendServerChan");
@@ -1556,14 +1579,7 @@ ${message.markdown}`
     };
     return postJson(provider, url, payload, timeoutSec);
   } catch (err) {
-    return {
-      providerId: provider.id,
-      providerName: provider.name,
-      providerType: provider.type,
-      success: false,
-      message: redactSensitiveText(provider, String(err)),
-      statusCode: null
-    };
+    return providerErrorResult(provider, err);
   }
 }
 __name(sendWecomChan, "sendWecomChan");
@@ -1814,19 +1830,29 @@ async function sendProvider(provider, message, timeoutSec) {
   }
 }
 __name(sendProvider, "sendProvider");
-async function sendDelivery(providers, message, mode, selectedProvider, failoverOrder, timeoutSec) {
+
+// src/push-delivery.ts
+function deliveryTargets(providers, mode, selectedProvider, failoverOrder) {
   const enabled = providers.filter((p) => p.enabled);
-  const validMode = ["all", "single", "failover"].includes(mode) ? mode : "all";
-  let targets;
-  if (validMode === "single") {
-    targets = enabled.filter((p) => p.id === selectedProvider);
-  } else if (validMode === "failover") {
+  if (mode === "single") {
+    return enabled.filter((p) => p.id === selectedProvider);
+  }
+  if (mode === "failover") {
     const order = failoverOrder.length > 0 ? failoverOrder : enabled.map((p) => p.id);
     const providerMap = new Map(enabled.map((p) => [p.id, p]));
-    targets = order.map((id) => providerMap.get(id)).filter((p) => p !== void 0);
-  } else {
-    targets = enabled;
+    return order.map((id) => providerMap.get(id)).filter((p) => p !== void 0);
   }
+  return enabled;
+}
+__name(deliveryTargets, "deliveryTargets");
+async function sendDelivery(providers, message, mode, selectedProvider, failoverOrder, timeoutSec) {
+  const validMode = ["all", "single", "failover"].includes(mode) ? mode : "all";
+  const targets = deliveryTargets(
+    providers,
+    validMode,
+    selectedProvider,
+    failoverOrder
+  );
   let results;
   if (validMode === "all") {
     results = await Promise.all(

@@ -17,6 +17,7 @@ DEFAULT_GAME_API_URL = (
 )
 DEFAULT_SCHEDULE_TIMES = "08:05,12:05,16:05,20:05"
 DEFAULT_CONFIG_PATH = "/data/config.json"
+PRESERVED_CONFIG_KEYS = {"console_auth"}
 
 ENV_PROVIDER_FIELDS: dict[str, dict[str, str]] = {
     "serverchan": {"sendkey": "SERVERCHAN_SENDKEY"},
@@ -227,31 +228,16 @@ class ConfigStore:
     def load(self) -> Settings:
         with self._lock:
             base = Settings.from_env()
-            if not self.path.exists():
+            payload = self._read_payload(record_issue=True)
+            if payload is None:
                 return base
-
-            try:
-                payload = json.loads(self.path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError) as exc:
-                self._record_load_issue(f"配置读取失败，已回退默认配置: {exc}")
-                return base
-
-            if not isinstance(payload, dict):
-                self._record_load_issue("配置文件格式错误，已回退默认配置: 顶层不是 JSON 对象")
-                return base
-            self.last_load_issue = None
             return Settings.from_mapping(payload, base=base)
 
     def save(self, settings: Settings) -> None:
         with self._lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            temp_path = self.path.with_suffix(self.path.suffix + ".tmp")
-            temp_path.write_text(
-                json.dumps(settings.to_dict(), ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            temp_path.replace(self.path)
-            self.last_load_issue = None
+            payload = settings.to_dict()
+            payload.update(self._preserved_payload())
+            self._write_payload(payload)
 
     def update(self, data: dict[str, Any]) -> Settings:
         with self._lock:
@@ -259,9 +245,63 @@ class ConfigStore:
             self.save(settings)
             return settings
 
+    def console_auth(self) -> dict[str, Any]:
+        with self._lock:
+            payload = self._read_payload(record_issue=True)
+            if payload is None:
+                return {}
+            auth = payload.get("console_auth")
+            return dict(auth) if isinstance(auth, dict) else {}
+
+    def save_console_auth(self, auth: dict[str, Any]) -> None:
+        with self._lock:
+            payload = self._read_payload(record_issue=True) or {}
+            payload["console_auth"] = dict(auth)
+            self._write_payload(payload)
+
     def load_issue_dict(self) -> dict[str, str] | None:
         with self._lock:
             return self.last_load_issue.to_dict() if self.last_load_issue else None
+
+    def _read_payload(self, *, record_issue: bool) -> dict[str, Any] | None:
+        if not self.path.exists():
+            return {}
+
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            if record_issue:
+                self._record_load_issue(f"配置读取失败，已回退默认配置: {exc}")
+            return None
+
+        if not isinstance(payload, dict):
+            if record_issue:
+                self._record_load_issue("配置文件格式错误，已回退默认配置: 顶层不是 JSON 对象")
+            return None
+
+        if record_issue:
+            self.last_load_issue = None
+        return payload
+
+    def _preserved_payload(self) -> dict[str, Any]:
+        payload = self._read_payload(record_issue=False)
+        if payload is None:
+            return {}
+        return {
+            key: payload[key]
+            for key in PRESERVED_CONFIG_KEYS
+            if isinstance(payload.get(key), dict)
+        }
+
+    def _write_payload(self, payload: dict[str, Any]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = self.path.with_suffix(self.path.suffix + ".tmp")
+        temp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temp_path.replace(self.path)
+        self.last_load_issue = None
 
     def _record_load_issue(self, message: str) -> None:
         backup_path, backup_error = self._backup_invalid_config()

@@ -155,8 +155,25 @@ function toInt(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function catalogNameCandidates(name: string): string[] {
+  const normalized = name.trim();
+  const candidates = normalized ? [normalized] : [];
+  if (normalized.includes("精灵蛋")) {
+    candidates.push(normalized.replaceAll("精灵蛋", "蛋"));
+  }
+  return [...new Set(candidates)];
+}
+
+function priceInfoForName(name: string): GoodsPriceInfo | undefined {
+  for (const candidate of catalogNameCandidates(name)) {
+    const info = GOODS_PRICE_INFO_BY_NAME.get(candidate);
+    if (info) return info;
+  }
+  return undefined;
+}
+
 function enrichPriceInfo(product: MerchantProduct): MerchantProduct {
-  const info = GOODS_PRICE_INFO_BY_NAME.get(product.name.trim());
+  const info = priceInfoForName(product.name);
   if (!info) return product;
   return { ...product, price: info.price, buyLimitNum: info.buyLimitNum };
 }
@@ -224,6 +241,9 @@ function productLine(product: MerchantProduct, includePriceInfo: boolean): strin
   ) {
     const total = product.price * product.buyLimitNum;
     return `${product.name}*${product.buyLimitNum}（${product.timeLabel}）单价${product.price} 合计${total.toLocaleString("en-US")}（${formatLuokeBay(total)}）`;
+  }
+  if (includePriceInfo) {
+    return `${product.name}（${product.timeLabel}）价格未收录`;
   }
   return `${product.name}（${product.timeLabel}）`;
 }

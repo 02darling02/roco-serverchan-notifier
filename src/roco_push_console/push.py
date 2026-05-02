@@ -3,17 +3,16 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import re
 import time
 import urllib.parse
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
 import requests
 
+from .push_delivery import DeliveryContext, DeliveryReport, send_delivery_with_options
+from .push_redaction import redact_sensitive_text
 from .provider_specs import PROVIDER_TYPES, provider_required_fields
-from .provider_specs import provider_secret_fields
 
 HttpSession = requests.Session
 
@@ -129,26 +128,6 @@ def _missing_required(provider: ProviderConfig) -> list[str]:
     ]
 
 
-_SENSITIVE_NAMES = "access_token|app_token|corpsecret|key|read_key|readkey|secret|sendkey|token|webhook"
-_SENSITIVE_QUERY_RE = re.compile(rf"(?i)(\b(?:{_SENSITIVE_NAMES})=)([^&\s]+)")
-_SENSITIVE_FIELD_RE = re.compile(
-    rf"(?i)(['\"]?\b(?:{_SENSITIVE_NAMES})\b['\"]?\s*[:=]\s*['\"]?)"
-    r"([^'\",\s}&]+)(['\"]?)"
-)
-
-
-def _redact_sensitive_text(provider: ProviderConfig, text: str) -> str:
-    redacted = str(text)
-    for field_name in provider_secret_fields(provider.type):
-        value = str(provider.config.get(field_name) or "").strip()
-        if value:
-            redacted = redacted.replace(value, "[已脱敏]")
-            redacted = redacted.replace(urllib.parse.quote_plus(value), "[已脱敏]")
-            redacted = redacted.replace(urllib.parse.quote(value, safe=""), "[已脱敏]")
-    redacted = _SENSITIVE_QUERY_RE.sub(r"\1[已脱敏]", redacted)
-    return _SENSITIVE_FIELD_RE.sub(r"\1[已脱敏]\3", redacted)
-
-
 def _result_from_response(
     provider: ProviderConfig,
     response: requests.Response,
@@ -168,7 +147,7 @@ def _result_from_response(
         provider.name,
         provider.type,
         success,
-        _redact_sensitive_text(provider, message),
+        redact_sensitive_text(provider, message),
         response.status_code,
     )
 
@@ -221,7 +200,7 @@ def send_provider(
             result.provider_name,
             result.provider_type,
             result.success,
-            _redact_sensitive_text(provider, result.message),
+            redact_sensitive_text(provider, result.message),
             result.status_code,
         )
     except Exception as exc:
@@ -230,7 +209,7 @@ def send_provider(
             provider.name,
             provider.type,
             False,
-            _redact_sensitive_text(provider, str(exc)),
+            redact_sensitive_text(provider, str(exc)),
         )
 
 
@@ -488,27 +467,6 @@ PROVIDER_SENDERS = {
 }
 
 
-@dataclass(frozen=True)
-class DeliveryReport:
-    success: bool
-    mode: str
-    results: list[PushResult]
-
-    def summary(self) -> str:
-        if not self.results:
-            return "没有可用推送通道"
-        ok_count = sum(1 for item in self.results if item.success)
-        return f"{ok_count}/{len(self.results)} 个通道成功"
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "success": self.success,
-            "mode": self.mode,
-            "summary": self.summary(),
-            "results": [item.to_dict() for item in self.results],
-        }
-
-
 def _delivery_options(
     options: DeliveryOptions | None,
     legacy_options: dict[str, Any],
@@ -537,56 +495,13 @@ def send_delivery(
     **legacy_options: Any,
 ) -> DeliveryReport:
     delivery_options = _delivery_options(options, legacy_options)
-    enabled = [provider for provider in providers if provider.enabled]
-    mode = delivery_options.mode
-    if mode not in {"all", "single", "failover"}:
-        mode = "all"
-
-    if mode == "single":
-        targets = [
-            provider
-            for provider in enabled
-            if provider.id == delivery_options.selected_provider
-        ]
-    elif mode == "failover":
-        order = delivery_options.failover_order or [provider.id for provider in enabled]
-        provider_map = {provider.id: provider for provider in enabled}
-        targets = [provider_map[item] for item in order if item in provider_map]
-    else:
-        targets = enabled
-
-    def send_target(provider: ProviderConfig) -> PushResult:
-        if delivery_options.session is not None:
-            return send_provider(
-                provider,
-                message,
-                session=delivery_options.session,
-                timeout=delivery_options.timeout,
-            )
-        with requests.Session() as provider_session:
-            return send_provider(
-                provider,
-                message,
-                session=provider_session,
-                timeout=delivery_options.timeout,
-            )
-
-    if mode == "all":
-        with ThreadPoolExecutor(max_workers=len(targets) or 1) as executor:
-            results = list(executor.map(send_target, targets))
-        return DeliveryReport(any(result.success for result in results), mode, results)
-
-    client = delivery_options.session or requests.Session()
-    results: list[PushResult] = []
-    for provider in targets:
-        result = send_provider(
-            provider,
-            message,
-            session=client,
+    return send_delivery_with_options(
+        providers,
+        delivery_options,
+        DeliveryContext(
+            message=message,
+            sender=send_provider,
+            session_factory=requests.Session,
             timeout=delivery_options.timeout,
-        )
-        results.append(result)
-        if mode == "failover" and result.success:
-            break
-
-    return DeliveryReport(any(result.success for result in results), mode, results)
+        ),
+    )

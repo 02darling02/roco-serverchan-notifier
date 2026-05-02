@@ -27,6 +27,23 @@ def goods_price_info_by_name() -> dict[str, dict[str, int]]:
     return result
 
 
+def price_info_for_name(name: str) -> dict[str, int] | None:
+    catalog = goods_price_info_by_name()
+    for candidate in _catalog_name_candidates(name):
+        info = catalog.get(candidate)
+        if info:
+            return dict(info)
+    return None
+
+
+def _catalog_name_candidates(name: str) -> list[str]:
+    normalized = name.strip()
+    candidates = [normalized] if normalized else []
+    if "精灵蛋" in normalized:
+        candidates.append(normalized.replace("精灵蛋", "蛋"))
+    return list(dict.fromkeys(candidates))
+
+
 def _to_int(value: Any) -> int | None:
     try:
         return int(value)

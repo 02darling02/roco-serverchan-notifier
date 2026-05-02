@@ -5,7 +5,7 @@ from typing import Any
 
 import requests
 
-from .goods_catalog import goods_price_info_by_name
+from .goods_catalog import price_info_for_name
 from .time_utils import ensure_beijing_time, format_timestamp, get_round_info
 
 
@@ -47,7 +47,7 @@ def _is_active_item(item: dict[str, Any], now_ms: int) -> bool:
 
 def _enrich_price_info(product: dict[str, str], item_name: str) -> dict[str, Any]:
     enriched: dict[str, Any] = dict(product)
-    info = goods_price_info_by_name().get(item_name.strip())
+    info = price_info_for_name(item_name)
     if info:
         enriched.update(info)
     return enriched

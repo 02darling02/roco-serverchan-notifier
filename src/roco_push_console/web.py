@@ -1,38 +1,27 @@
 from __future__ import annotations
 
-import asyncio
-import base64
-import hashlib
-import hmac
 import os
-import secrets
-import time
 from contextlib import asynccontextmanager
-from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-import requests
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .config import ConfigStore, Settings
+from . import web_auth, web_services
+from .config import ConfigStore
 from .provider_specs import PROVIDER_TYPES
-from .push import DeliveryOptions, NotificationMessage, send_delivery, send_provider
-from .scheduler import SchedulerService, parse_schedule_times
-from .time_utils import beijing_now
+from .scheduler import SchedulerService
 
 
-SESSION_COOKIE_NAME = "roco_console_session"
+SESSION_COOKIE_NAME = web_auth.SESSION_COOKIE_NAME
 PACKAGE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = PACKAGE_DIR / "static"
 TEMPLATE_DIR = PACKAGE_DIR / "templates"
-_GENERATED_CONSOLE_PASSWORD: str | None = None
-_LOGGED_CONSOLE_PASSWORD = False
 store = ConfigStore()
 scheduler = SchedulerService(store)
 static_files = StaticFiles(directory=str(STATIC_DIR))
@@ -40,7 +29,7 @@ static_files = StaticFiles(directory=str(STATIC_DIR))
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    _log_console_password_once()
+    web_auth.log_console_password_once(store)
     scheduler.start()
     try:
         yield
@@ -56,111 +45,8 @@ async def static_asset(path: str, request: Request):
     return await static_files.get_response(path, request.scope)
 
 
-def _format_dt(value: datetime | None) -> str:
-    return value.strftime("%Y-%m-%d %H:%M:%S") if value else "-"
-
-
-def _auth_password() -> str:
-    configured = os.environ.get("CONSOLE_PASSWORD", "").strip()
-    if configured or _allow_empty_password():
-        return configured
-    return _generated_console_password()
-
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    value = os.environ.get(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on", "y"}
-
-
-def _allow_empty_password() -> bool:
-    return _env_bool("CONSOLE_ALLOW_EMPTY_PASSWORD", False)
-
-
-def _generated_console_password() -> str:
-    global _GENERATED_CONSOLE_PASSWORD
-    if _GENERATED_CONSOLE_PASSWORD is None:
-        _GENERATED_CONSOLE_PASSWORD = secrets.token_urlsafe(24)
-    return _GENERATED_CONSOLE_PASSWORD
-
-
-def _uses_generated_console_password() -> bool:
-    return not os.environ.get("CONSOLE_PASSWORD", "").strip() and not _allow_empty_password()
-
-
-def _log_console_password_once() -> None:
-    global _LOGGED_CONSOLE_PASSWORD
-    if _LOGGED_CONSOLE_PASSWORD or not _uses_generated_console_password():
-        return
-    password = _auth_password()
-    print("控制台未设置 CONSOLE_PASSWORD，已生成本次启动默认密码：", flush=True)
-    print(f"控制台默认密码: {password}", flush=True)
-    print("请尽快在 .env 中设置 CONSOLE_PASSWORD 保存固定强密码。", flush=True)
-    _LOGGED_CONSOLE_PASSWORD = True
-
-
-def _reset_generated_password_for_tests() -> None:
-    global _GENERATED_CONSOLE_PASSWORD, _LOGGED_CONSOLE_PASSWORD
-    _GENERATED_CONSOLE_PASSWORD = None
-    _LOGGED_CONSOLE_PASSWORD = False
-
-
-def _auth_username() -> str:
-    return os.environ.get("CONSOLE_USERNAME", "admin").strip() or "admin"
-
-
-def _session_ttl() -> int:
-    try:
-        return max(300, int(os.environ.get("CONSOLE_SESSION_TTL", "86400")))
-    except ValueError:
-        return 86400
-
-
-def _session_secret() -> bytes:
-    seed = os.environ.get("CONSOLE_SESSION_SECRET") or _auth_password() or "roco-push-console"
-    return seed.encode("utf-8")
-
-
-def _sign_session(username: str, expires_at: int, nonce: str) -> str:
-    body = f"{username}|{expires_at}|{nonce}".encode("utf-8")
-    return hmac.new(_session_secret(), body, hashlib.sha256).hexdigest()
-
-
-def _make_session_cookie(username: str) -> str:
-    expires_at = int(time.time()) + _session_ttl()
-    nonce = secrets.token_urlsafe(12)
-    signature = _sign_session(username, expires_at, nonce)
-    token = f"{username}|{expires_at}|{nonce}|{signature}".encode("utf-8")
-    return base64.urlsafe_b64encode(token).decode("ascii")
-
-
-def _valid_session_cookie(value: str | None) -> bool:
-    if not value:
-        return False
-    try:
-        decoded = base64.urlsafe_b64decode(value.encode("ascii")).decode("utf-8")
-        username, expires_text, nonce, signature = decoded.split("|", 3)
-        expires_at = int(expires_text)
-    except (ValueError, UnicodeDecodeError):
-        return False
-    if expires_at < int(time.time()):
-        return False
-    if not secrets.compare_digest(username, _auth_username()):
-        return False
-    expected = _sign_session(username, expires_at, nonce)
-    return secrets.compare_digest(signature, expected)
-
-
-def _is_authenticated(request: Request) -> bool:
-    password = _auth_password()
-    if not password:
-        return _allow_empty_password()
-    return _valid_session_cookie(request.cookies.get(SESSION_COOKIE_NAME))
-
-
 def _require_auth(request: Request) -> None:
-    if not _is_authenticated(request):
+    if not web_auth.is_authenticated(store, request):
         raise HTTPException(status_code=401, detail="请先登录控制台")
 
 
@@ -176,15 +62,15 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    if not _auth_password() or _is_authenticated(request):
+    if not web_auth.auth_enabled(store) or web_auth.is_authenticated(store, request):
         return RedirectResponse("/", status_code=303)
     return HTMLResponse(render_login_html())
 
 
 @app.post("/api/login")
 async def api_login(request: Request) -> JSONResponse:
-    if not _auth_password():
-        if _allow_empty_password():
+    if not web_auth.auth_enabled(store):
+        if web_auth.allow_empty_password():
             return JSONResponse({"ok": True, "message": "未启用控制台认证"})
 
     try:
@@ -194,15 +80,14 @@ async def api_login(request: Request) -> JSONResponse:
 
     username = str(payload.get("username", "")).strip()
     password = str(payload.get("password", ""))
-    valid = secrets.compare_digest(username, _auth_username()) and secrets.compare_digest(password, _auth_password())
-    if not valid:
+    if not web_auth.credentials_are_valid(store, username, password):
         raise HTTPException(status_code=401, detail="用户名或密码不正确")
 
     response = JSONResponse({"ok": True, "message": "登录成功"})
     response.set_cookie(
         SESSION_COOKIE_NAME,
-        _make_session_cookie(username),
-        max_age=_session_ttl(),
+        web_auth.make_session_cookie(store, username),
+        max_age=web_auth.session_ttl(),
         httponly=True,
         samesite="lax",
         secure=request.url.scheme == "https",
@@ -229,43 +114,18 @@ async def api_provider_types() -> dict[str, Any]:
 
 @app.get("/api/state", dependencies=[Depends(_require_auth)])
 async def api_state() -> dict[str, Any]:
-    settings = store.load()
-    return {
-        "config": settings.public_dict(),
-        "config_issue": store.load_issue_dict(),
-        "provider_types": PROVIDER_TYPES,
-        "scheduler": scheduler.state.to_dict(),
-        "auth_enabled": bool(_auth_password()),
-        "now": beijing_now().isoformat(),
-    }
+    return web_services.build_state_payload(store, scheduler)
 
 
 @app.post("/api/config", dependencies=[Depends(_require_auth)])
 async def api_save_config(request: Request) -> JSONResponse:
     payload = await request.json()
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="配置格式错误")
-
-    schedule_times = str(payload.get("schedule_times", "")).strip()
     try:
-        parse_schedule_times(schedule_times)
+        settings = web_services.save_config_payload(store, scheduler, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    providers = payload.get("providers", [])
-    if not isinstance(providers, list):
-        raise HTTPException(status_code=400, detail="通道配置格式错误")
-    for provider in providers:
-        if not isinstance(provider, dict):
-            raise HTTPException(status_code=400, detail="通道配置格式错误")
-        if provider.get("type") not in PROVIDER_TYPES:
-            raise HTTPException(status_code=400, detail=f"未知通道类型: {provider.get('type')}")
-
-    try:
-        settings = store.update(payload)
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"配置保存失败: {exc}") from exc
-    scheduler.wake()
     return JSONResponse({"ok": True, "config": settings.public_dict()})
 
 
@@ -280,62 +140,14 @@ async def api_run_now() -> JSONResponse:
 @app.post("/api/test-push", dependencies=[Depends(_require_auth)])
 async def api_test_push(request: Request) -> JSONResponse:
     payload = await request.json()
-    provider_id = str(payload.get("provider_id", "")).strip() if isinstance(payload, dict) else ""
-    settings = _settings_from_test_payload(payload)
-    message = NotificationMessage(
-        "远行商人提醒测试",
-        "控制台测试推送成功。",
-        f"### 控制台测试推送\n\n北京时间：{_format_dt(beijing_now())}",
-    )
-
-    session = requests.Session()
-    if provider_id:
-        provider = next((item for item in settings.providers if item.id == provider_id), None)
-        if provider is None:
-            raise HTTPException(status_code=404, detail="通道不存在")
-        result = await asyncio.to_thread(
-            send_provider,
-            provider,
-            message,
-            session=session,
-            timeout=settings.http_timeout,
-        )
-        if not result.success:
-            raise HTTPException(status_code=500, detail=f"测试推送失败: {result.message}")
-        return JSONResponse({"ok": True, "message": f"{provider.name} 测试推送已发送", "results": [result.to_dict()]})
-
-    report = await asyncio.to_thread(
-        send_delivery,
-        settings.providers,
-        message,
-        options=DeliveryOptions(
-            mode=settings.delivery_mode,
-            selected_provider=settings.selected_provider,
-            failover_order=settings.failover_order,
-            session=session,
-            timeout=settings.http_timeout,
-        ),
-    )
-    if not report.success:
-        raise HTTPException(status_code=500, detail=f"测试推送失败: {report.summary()}")
-    return JSONResponse({"ok": True, "message": "测试推送已发送", "results": report.to_dict()["results"]})
-
-
-def _settings_from_test_payload(payload: Any) -> Settings:
-    settings = store.load()
-    if not isinstance(payload, dict):
-        return settings
-
-    draft_config = payload.get("config")
-    if not isinstance(draft_config, dict):
-        return settings
-
-    for provider in draft_config.get("providers", []):
-        if not isinstance(provider, dict) or provider.get("type") not in PROVIDER_TYPES:
-            provider_type = provider.get("type") if isinstance(provider, dict) else provider
-            raise HTTPException(status_code=400, detail=f"未知通道类型: {provider_type}")
-
-    return Settings.from_mapping(draft_config, base=settings, keep_blank_secrets=True)
+    try:
+        return JSONResponse(await web_services.send_test_push(store, payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 def cli() -> None:
@@ -349,7 +161,7 @@ def _read_template(name: str) -> str:
 
 
 def render_login_html() -> str:
-    username = escape(_auth_username(), quote=True)
+    username = escape(web_auth.auth_username(), quote=True)
     return _read_template("login.html").replace("__USERNAME__", username)
 
 
