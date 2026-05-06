@@ -4,6 +4,10 @@ GitHub Actions 版适合已经在用 GitHub 仓库、又不想单独维护服务
 
 如果你更看重长期稳定性，优先考虑 [Cloudflare Workers 完整部署指南](cloudflare-workers.md)。
 
+## 目录
+
+[适用场景](#适用场景) · [默认调度](#默认调度) · [配置步骤](#配置步骤) · [查看日志与排错](#查看日志与排错) · [其他工作流](#仓库里的其他-github-actions-工作流) · [限制与建议](#限制与建议) · [迁移到 Cloudflare Workers](#迁移到-cloudflare-workers)
+
 ## 适用场景
 
 - 仓库已经托管在 GitHub

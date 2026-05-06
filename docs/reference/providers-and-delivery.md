@@ -2,6 +2,10 @@
 
 这份文档汇总所有支持的推送通道、发送策略，以及 Cloudflare Workers / 环境变量模式下会用到的 provider id。
 
+## 目录
+
+[推送通道](#推送通道) · [通道卡片说明](#docker-web-控制台的通道卡片说明) · [发送策略](#发送策略) · [provider id](#cloudflare-workers--环境变量模式中的-provider-id) · [常见发送变量](#cloudflare-workers-中常见的发送相关变量)
+
 ## 推送通道
 
 Docker 版和 Cloudflare Workers 版支持完全一致的 12 种推送通道：

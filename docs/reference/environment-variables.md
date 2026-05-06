@@ -2,6 +2,16 @@
 
 这份文档汇总 Docker / 本地运行 和 Cloudflare Workers 版的全部环境变量。根目录 [README](../../README.md) 只保留首次部署真正需要的少量字段，这里负责查全量表。
 
+## 目录
+
+- [使用优先级](#使用优先级)
+- [Docker / 本地运行](#docker--本地运行)
+  - [基础变量](#基础变量)
+  - [无控制台通道变量](#无控制台通道变量)
+- [Cloudflare Workers](#cloudflare-workers)
+  - [Secrets（敏感字段）](#secrets敏感字段)
+  - [Variables（非敏感字段）](#variables非敏感字段)
+
 ## 使用优先级
 
 - `.env`、`docker run -e`、GitHub Actions Secrets / Variables、Cloudflare Worker Variables / Secrets 都是配置来源
