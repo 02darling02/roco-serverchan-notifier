@@ -3,6 +3,7 @@ import { afterEach, test } from "node:test";
 
 import worker from "../src/index";
 import { loadConfig } from "../src/config";
+import { providerEnvBindingNames } from "../src/provider-specs";
 import { buildMerchantMarkdown, processMerchantData } from "../src/rocom";
 import { sendDelivery } from "../src/push";
 import type { Env, NotificationMessage, ProviderConfig } from "../src/types";
@@ -18,24 +19,12 @@ afterEach(() => {
 });
 
 function env(overrides: Partial<Env> = {}): Env {
+  const providerBindings = Object.fromEntries(
+    providerEnvBindingNames().map((name) => [name, ""])
+  );
+
   return {
     ROCOM_API_KEY: "",
-    SERVERCHAN_SENDKEY: "",
-    PUSHPLUS_TOKEN: "",
-    WECOM_CORPID: "",
-    WECOM_SECRET: "",
-    WECOM_AGENTID: "",
-    WECOM_BOT_WEBHOOK: "",
-    WECOM_BOT_KEY: "",
-    WXPUSHER_APP_TOKEN: "",
-    BARK_DEVICE_KEY: "",
-    DINGTALK_WEBHOOK: "",
-    DINGTALK_SECRET: "",
-    FEISHU_WEBHOOK: "",
-    FEISHU_SECRET: "",
-    NTFY_TOPIC: "",
-    NTFY_TOKEN: "",
-    GOTIFY_APP_TOKEN: "",
     TRIGGER_TOKEN: "",
     ROCOM_API_URL: "",
     NOTIFY_EMPTY: "",
@@ -44,18 +33,7 @@ function env(overrides: Partial<Env> = {}): Env {
     FAILOVER_ORDER: "",
     HTTP_TIMEOUT: "",
     INCLUDE_PRICE_INFO: "",
-    PUSHPLUS_TOPIC: "",
-    PUSHPLUS_CHANNEL: "",
-    WECOM_TOUSER: "",
-    WXPUSHER_UIDS: "",
-    WXPUSHER_TOPIC_IDS: "",
-    BARK_SERVER_URL: "",
-    BARK_GROUP: "",
-    NTFY_BASE_URL: "",
-    NTFY_PRIORITY: "",
-    NTFY_TAGS: "",
-    GOTIFY_BASE_URL: "",
-    GOTIFY_PRIORITY: "",
+    ...providerBindings,
     ...overrides,
   };
 }
@@ -387,6 +365,13 @@ test("loadConfig defaults to cached RoCom merchant endpoint when API URL is blan
     config.gameApiUrl,
     "https://wegame.shallow.ink/api/v1/games/rocom/merchant/info"
   );
+});
+
+test("loadConfig enables wecom bot with key only", () => {
+  const config = loadConfig(env({ WECOM_BOT_KEY: "bot-key" }));
+
+  assert.equal(config.providers[0].type, "wecom_bot");
+  assert.equal(config.providers[0].config.key, "bot-key");
 });
 
 test("trigger endpoint rejects invalid token while health remains public", async () => {

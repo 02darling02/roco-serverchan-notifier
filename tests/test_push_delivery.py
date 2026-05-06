@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import threading
 import unittest
 from unittest.mock import patch
@@ -11,9 +12,11 @@ except ImportError:
 
 from roco_push_console import app as app_module
 from roco_push_console import push as push_module
+from roco_push_console.provider_specs import PROVIDER_TYPES
 from roco_push_console.push import (
     DeliveryReport,
     NotificationMessage,
+    PROVIDER_SENDERS,
     ProviderConfig,
     PushResult,
     _WECOM_TOKEN_CACHE,
@@ -24,6 +27,18 @@ from roco_push_console.push import (
 
 
 class PushDeliveryTests(RocoTestCase):
+    def test_push_provider_senders_are_grouped_by_family_modules(self):
+        registry = importlib.import_module("roco_push_console.push_provider_senders.registry")
+        token = importlib.import_module("roco_push_console.push_provider_senders.token")
+        webhook = importlib.import_module("roco_push_console.push_provider_senders.webhook")
+        wecom = importlib.import_module("roco_push_console.push_provider_senders.wecom")
+
+        self.assertEqual(set(registry.PROVIDER_SENDERS), set(PROVIDER_SENDERS))
+        self.assertEqual(set(registry.PROVIDER_SENDERS), set(PROVIDER_TYPES))
+        self.assertIs(registry.PROVIDER_SENDERS["pushplus"], token.send_pushplus)
+        self.assertIs(registry.PROVIDER_SENDERS["dingtalk_bot"], webhook.send_dingtalk_bot)
+        self.assertIs(registry.PROVIDER_SENDERS["wecomchan"], wecom.send_wecomchan)
+
     def test_serverchan_provider_posts_expected_payload(self):
         provider = ProviderConfig("p1", "serverchan", "Server 酱", True, {"sendkey": "SCT123"})
         message = NotificationMessage("标题", "摘要", "正文")
@@ -162,6 +177,17 @@ class PushDeliveryTests(RocoTestCase):
         self.assertEqual(session.calls[0]["json"]["token"], "tok")
         self.assertEqual(session.calls[0]["json"]["template"], "markdown")
         self.assertEqual(session.calls[0]["json"]["topic"], "ops")
+
+    def test_sender_required_validation_accepts_manifest_defaults(self):
+        provider = ProviderConfig("p1", "bark", "Bark", True, {"device_key": "device-key"})
+        message = NotificationMessage("标题", "摘要", "正文")
+        session = FakeSession([FakeResponse({"code": 0})])
+
+        result = send_provider(provider, message, session=session)
+
+        self.assertTrue(result.success)
+        self.assertEqual(session.calls[0]["url"], "https://api.day.app/device-key")
+        self.assertEqual(session.calls[0]["json"]["group"], "洛克王国")
 
     def test_wecomchan_token_is_cached(self):
         _WECOM_TOKEN_CACHE.clear()

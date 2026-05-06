@@ -1,5 +1,9 @@
 import {escapeHTML, newId} from "./console-format.js";
 
+function hasDefault(field) {
+  return Object.prototype.hasOwnProperty.call(field, "default");
+}
+
 export function providerLabel(providerTypes, type) {
   return (providerTypes[type] && providerTypes[type].label) || type;
 }
@@ -31,7 +35,7 @@ export function renderProviders($, providers, providerTypes, config = {}) {
     const fields = spec.fields.map(field => {
       const value = provider.config[field.name] ?? "";
       const hasValue = provider.config[`has_${field.name}`];
-      const placeholder = field.secret && hasValue ? "已配置，留空不改" : (field.default || "");
+      const placeholder = field.secret && hasValue ? "已配置，留空不改" : (hasDefault(field) ? field.default : "");
       const fieldName = escapeHTML(field.name);
       const inputType = field.secret ? "password" : "text";
       return `
@@ -107,7 +111,7 @@ export function createProvider(type, providerTypes) {
   if (!spec) return null;
   const config = {};
   (spec.fields || []).forEach(field => {
-    if (field.default) config[field.name] = field.default;
+    if (hasDefault(field)) config[field.name] = field.default;
   });
   return {id: newId(type), type, name: spec.label, enabled: true, config};
 }

@@ -1,23 +1,6 @@
-/** Cloudflare Worker environment bindings */
-export interface Env {
-  // Secrets
+/** Cloudflare Worker bindings that are not owned by provider_manifest.json. */
+export interface CoreEnv {
   ROCOM_API_KEY: string;
-  SERVERCHAN_SENDKEY: string;
-  PUSHPLUS_TOKEN: string;
-  WECOM_CORPID: string;
-  WECOM_SECRET: string;
-  WECOM_AGENTID: string;
-  WECOM_BOT_WEBHOOK: string;
-  WECOM_BOT_KEY: string;
-  WXPUSHER_APP_TOKEN: string;
-  BARK_DEVICE_KEY: string;
-  DINGTALK_WEBHOOK: string;
-  DINGTALK_SECRET: string;
-  FEISHU_WEBHOOK: string;
-  FEISHU_SECRET: string;
-  NTFY_TOPIC: string;
-  NTFY_TOKEN: string;
-  GOTIFY_APP_TOKEN: string;
   TRIGGER_TOKEN: string;
 
   // Vars (from wrangler.toml [vars])
@@ -28,19 +11,9 @@ export interface Env {
   FAILOVER_ORDER: string;
   HTTP_TIMEOUT: string;
   INCLUDE_PRICE_INFO: string;
-  PUSHPLUS_TOPIC: string;
-  PUSHPLUS_CHANNEL: string;
-  WECOM_TOUSER: string;
-  WXPUSHER_UIDS: string;
-  WXPUSHER_TOPIC_IDS: string;
-  BARK_SERVER_URL: string;
-  BARK_GROUP: string;
-  NTFY_BASE_URL: string;
-  NTFY_PRIORITY: string;
-  NTFY_TAGS: string;
-  GOTIFY_BASE_URL: string;
-  GOTIFY_PRIORITY: string;
 }
+
+export type Env = CoreEnv & Record<string, string | undefined>;
 
 export interface ProviderField {
   name: string;
@@ -54,6 +27,8 @@ export interface ProviderSpec {
   label: string;
   description: string;
   fields: ProviderField[];
+  envId: string;
+  envVars: Record<string, string>;
 }
 
 export interface ProviderConfig {

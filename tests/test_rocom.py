@@ -9,7 +9,15 @@ except ImportError:
     from helpers import RocoTestCase, load_cross_runtime_fixture
 
 from roco_push_console.merchant_message import build_merchant_markdown
-from roco_push_console.provider_specs import provider_required_fields, provider_secret_fields
+from roco_push_console.provider_specs import (
+    PROVIDER_TYPES,
+    provider_env_binding_names,
+    provider_env_fields,
+    provider_env_id,
+    provider_required_fields,
+    provider_secret_fields,
+    validate_provider_manifest,
+)
 from roco_push_console.rocom import process_merchant_data
 from roco_push_console.time_utils import get_round_info
 
@@ -200,6 +208,37 @@ class RocomTests(RocoTestCase):
         for case in fixture["provider_specs"]:
             self.assertEqual(sorted(provider_secret_fields(case["type"])), sorted(case["secret_fields"]))
             self.assertEqual(sorted(provider_required_fields(case["type"])), sorted(case["required_fields"]))
+
+    def test_shared_provider_manifest_exposes_env_mapping(self):
+        for provider_type, spec in PROVIDER_TYPES.items():
+            self.assertEqual(provider_env_id(provider_type), spec["envId"])
+            self.assertEqual(provider_env_fields(provider_type), spec["envVars"])
+
+    def test_provider_env_binding_names_are_derived_from_manifest(self):
+        expected: list[str] = []
+        for spec in PROVIDER_TYPES.values():
+            for env_name in spec["envVars"].values():
+                if env_name not in expected:
+                    expected.append(env_name)
+
+        self.assertEqual(provider_env_binding_names(), expected)
+
+    def test_provider_manifest_validation_rejects_unmapped_env_vars(self):
+        with self.assertRaises(ValueError):
+            validate_provider_manifest(
+                {
+                    "providers": [
+                        {
+                            "type": "broken",
+                            "label": "Broken",
+                            "description": "Broken provider",
+                            "envId": "broken-env",
+                            "envVars": {"token": "BROKEN_TOKEN"},
+                            "fields": [{"name": "other", "label": "Other"}],
+                        }
+                    ]
+                }
+            )
 
 
 if __name__ == "__main__":

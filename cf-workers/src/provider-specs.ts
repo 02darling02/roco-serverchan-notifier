@@ -1,108 +1,155 @@
+import providerManifest from "../../src/roco_push_console/shared/provider_manifest.json";
 import type { ProviderSpec } from "./types";
 
-export const PROVIDER_TYPES: Record<string, ProviderSpec> = {
-  serverchan: {
-    label: "Server 酱",
-    description: "通过 Server 酱 SendKey 推送到微信。",
-    fields: [
-      { name: "sendkey", label: "SendKey", secret: true, required: true },
-    ],
-  },
-  pushplus: {
-    label: "PushPlus",
-    description: "通过 PushPlus token 推送，默认使用 markdown 模板。",
-    fields: [
-      { name: "token", label: "Token", secret: true, required: true },
-      { name: "topic", label: "群组编码", required: false },
-      { name: "channel", label: "渠道", required: false },
-    ],
-  },
-  wecomchan: {
-    label: "Wecom 酱 / 企业微信应用",
-    description: "使用企业微信应用参数获取 access_token 后发送消息。",
-    fields: [
-      { name: "corpid", label: "CorpID", secret: true, required: true },
-      { name: "secret", label: "Secret", secret: true, required: true },
-      { name: "agentid", label: "AgentID", required: true },
-      { name: "touser", label: "接收人", required: true, default: "@all" },
-    ],
-  },
-  wecom_bot: {
-    label: "企业微信群机器人",
-    description: "使用企业微信群机器人 webhook 或 key 推送 markdown。",
-    fields: [
-      { name: "webhook", label: "Webhook", secret: true, required: false },
-      { name: "key", label: "Key", secret: true, required: false },
-    ],
-  },
-  wxpusher: {
-    label: "WxPusher",
-    description: "通过 WxPusher appToken 推送给 UID 或主题。",
-    fields: [
-      { name: "app_token", label: "AppToken", secret: true, required: true },
-      { name: "uids", label: "UID 列表", required: false },
-      { name: "topic_ids", label: "Topic ID 列表", required: false },
-    ],
-  },
-  bark: {
-    label: "Bark",
-    description: "通过 Bark server 和 device key 推送到 iOS。",
-    fields: [
-      {
-        name: "server_url",
-        label: "Server URL",
-        required: true,
-        default: "https://api.day.app",
-      },
-      { name: "device_key", label: "Device Key", secret: true, required: true },
-      { name: "group", label: "分组", required: false, default: "洛克王国" },
-    ],
-  },
-  dingtalk_bot: {
-    label: "钉钉群机器人",
-    description: "使用钉钉 webhook 推送 markdown，可选 secret 加签。",
-    fields: [
-      { name: "webhook", label: "Webhook", secret: true, required: true },
-      { name: "secret", label: "Secret", secret: true, required: false },
-    ],
-  },
-  feishu_bot: {
-    label: "飞书群机器人",
-    description: "使用飞书 webhook 推送富文本，可选 secret 加签。",
-    fields: [
-      { name: "webhook", label: "Webhook", secret: true, required: true },
-      { name: "secret", label: "Secret", secret: true, required: false },
-    ],
-  },
-  ntfy: {
-    label: "ntfy",
-    description: "发布到 ntfy topic，可选 bearer token。",
-    fields: [
-      {
-        name: "base_url",
-        label: "Base URL",
-        required: true,
-        default: "https://ntfy.sh",
-      },
-      { name: "topic", label: "Topic", secret: true, required: true },
-      { name: "token", label: "Token", secret: true, required: false },
-      { name: "priority", label: "优先级", required: false, default: "default" },
-      { name: "tags", label: "标签", required: false },
-    ],
-  },
-  gotify: {
-    label: "Gotify",
-    description: "通过 Gotify app token 推送消息。",
-    fields: [
-      { name: "base_url", label: "Base URL", required: true },
-      { name: "app_token", label: "App Token", secret: true, required: true },
-      { name: "priority", label: "优先级", required: false, default: "5" },
-    ],
-  },
+type ProviderManifestEntry = ProviderSpec & { type: string };
+type ProviderManifest = {
+  providers: ProviderManifestEntry[];
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function validateProviderManifest(value: unknown): ProviderManifest {
+  if (!isRecord(value)) {
+    throw new Error("Invalid provider manifest: root must be an object");
+  }
+
+  const providersValue = value.providers;
+  if (!Array.isArray(providersValue)) {
+    throw new Error("Invalid provider manifest: providers must be an array");
+  }
+
+  const providers: ProviderManifestEntry[] = [];
+  const seenTypes = new Set<string>();
+
+  providersValue.forEach((providerValue, providerIndex) => {
+    if (!isRecord(providerValue)) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}] must be an object`);
+    }
+
+    const { type, label, description, envId, envVars, fields } = providerValue;
+    if (typeof type !== "string" || !type.trim()) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].type must be a non-empty string`);
+    }
+    if (seenTypes.has(type)) {
+      throw new Error(`Invalid provider manifest: duplicate provider type ${type}`);
+    }
+    seenTypes.add(type);
+
+    if (typeof label !== "string" || !label.trim()) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].label must be a non-empty string`);
+    }
+    if (typeof description !== "string" || !description.trim()) {
+      throw new Error(
+        `Invalid provider manifest: providers[${providerIndex}].description must be a non-empty string`
+      );
+    }
+    if (typeof envId !== "string" || !envId.trim()) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].envId must be a non-empty string`);
+    }
+    if (!isRecord(envVars)) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].envVars must be an object`);
+    }
+    if (!Array.isArray(fields)) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].fields must be an array`);
+    }
+
+    const fieldNames = new Set<string>();
+    const normalizedFields = fields.map((fieldValue, fieldIndex) => {
+      if (!isRecord(fieldValue)) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}] must be an object`
+        );
+      }
+
+      const { name, label, secret, required, default: defaultValue } = fieldValue;
+      if (typeof name !== "string" || !name.trim()) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].name must be a non-empty string`
+        );
+      }
+      if (typeof label !== "string" || !label.trim()) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].label must be a non-empty string`
+        );
+      }
+      if (fieldNames.has(name)) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}] contains duplicate field ${name}`
+        );
+      }
+      fieldNames.add(name);
+      if (secret !== undefined && typeof secret !== "boolean") {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].secret must be a boolean`
+        );
+      }
+      if (required !== undefined && typeof required !== "boolean") {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].required must be a boolean`
+        );
+      }
+      if (defaultValue !== undefined && typeof defaultValue !== "string") {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].default must be a string`
+        );
+      }
+
+      return {
+        name,
+        label,
+        ...(secret !== undefined ? { secret } : {}),
+        ...(required !== undefined ? { required } : {}),
+        ...(defaultValue !== undefined ? { default: defaultValue } : {}),
+      };
+    });
+
+    const normalizedEnvVars: Record<string, string> = {};
+    for (const [envName, envValue] of Object.entries(envVars)) {
+      if (typeof envName !== "string" || !envName.trim()) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].envVars contains an empty key`
+        );
+      }
+      if (typeof envValue !== "string" || !envValue.trim()) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].envVars.${envName} must be a non-empty string`
+        );
+      }
+      if (!fieldNames.has(envName)) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].envVars.${envName} is not declared in fields`
+        );
+      }
+      normalizedEnvVars[envName] = envValue;
+    }
+
+    providers.push({
+      type,
+      label,
+      description,
+      envId,
+      envVars: normalizedEnvVars,
+      fields: normalizedFields,
+    });
+  });
+
+  return { providers };
+}
+
+const manifest = validateProviderManifest(providerManifest);
+
+export const PROVIDER_TYPES: Record<string, ProviderSpec> = Object.fromEntries(
+  manifest.providers.map(({ type, ...spec }) => [type, spec])
+) as Record<string, ProviderSpec>;
+
+export function providerSpec(providerType: string): ProviderSpec | undefined {
+  return PROVIDER_TYPES[providerType];
+}
+
 export function providerSecretFields(providerType: string): Set<string> {
-  const spec = PROVIDER_TYPES[providerType];
+  const spec = providerSpec(providerType);
   if (!spec) return new Set();
   return new Set(
     spec.fields.filter((f) => f.secret).map((f) => f.name)
@@ -110,9 +157,39 @@ export function providerSecretFields(providerType: string): Set<string> {
 }
 
 export function providerRequiredFields(providerType: string): Set<string> {
-  const spec = PROVIDER_TYPES[providerType];
+  const spec = providerSpec(providerType);
   if (!spec) return new Set();
   return new Set(
     spec.fields.filter((f) => f.required).map((f) => f.name)
   );
+}
+
+export function providerFieldDefault(
+  providerType: string,
+  fieldName: string
+): string | undefined {
+  const spec = providerSpec(providerType);
+  const field = spec?.fields.find((item) => item.name === fieldName);
+  return field && Object.prototype.hasOwnProperty.call(field, "default")
+    ? field.default
+    : undefined;
+}
+
+export function providerEnvFields(providerType: string): Record<string, string> {
+  const spec = providerSpec(providerType);
+  if (!spec) return {};
+  return { ...spec.envVars };
+}
+
+export function providerEnvBindingNames(): string[] {
+  return [
+    ...new Set(
+      Object.values(PROVIDER_TYPES).flatMap((spec) => Object.values(spec.envVars))
+    ),
+  ];
+}
+
+export function providerEnvId(providerType: string): string {
+  const spec = providerSpec(providerType);
+  return spec?.envId || `${providerType}-env`;
 }

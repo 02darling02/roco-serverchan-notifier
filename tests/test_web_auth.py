@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import tempfile
 import unittest
@@ -21,6 +22,16 @@ from roco_push_console.push import ProviderConfig
 
 
 class WebAuthTests(RocoTestCase):
+    def test_web_auth_delegates_to_password_and_session_modules(self):
+        password_module = importlib.import_module("roco_push_console.console_password")
+        session_module = importlib.import_module("roco_push_console.console_session")
+
+        self.assertIs(web_auth.auth_password, password_module.auth_password)
+        self.assertIs(web_auth.check_auth_password, password_module.check_auth_password)
+        self.assertIs(web_auth.make_session_cookie, session_module.make_session_cookie)
+        self.assertIs(web_auth.valid_session_cookie, session_module.valid_session_cookie)
+        self.assertEqual(web_auth.SESSION_COOKIE_NAME, session_module.SESSION_COOKIE_NAME)
+
     def test_rendered_pages_reference_static_assets(self):
         login_html = web_module.render_login_html()
         index_html = web_module.render_index_html()

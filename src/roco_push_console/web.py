@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import web_auth, web_services
 from .config_store import ConfigStore
-from .provider_specs import PROVIDER_TYPES
+from .provider_specs import public_provider_types
 from .scheduler import SchedulerService
 
 
@@ -109,7 +109,7 @@ async def index() -> str:
 
 @app.get("/api/provider-types", dependencies=[Depends(_require_auth)])
 async def api_provider_types() -> dict[str, Any]:
-    return {"provider_types": PROVIDER_TYPES}
+    return {"provider_types": public_provider_types()}
 
 
 @app.get("/api/state", dependencies=[Depends(_require_auth)])

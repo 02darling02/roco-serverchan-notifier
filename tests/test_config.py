@@ -249,6 +249,17 @@ class ConfigTests(RocoTestCase):
         self.assertEqual(settings.providers[0].config["server_url"], "https://api.day.app")
         self.assertEqual(settings.providers[0].config["group"], "洛克王国")
 
+    def test_settings_from_env_enables_wecom_bot_with_key_only(self):
+        with patch.dict(
+            "os.environ",
+            {"ROCOM_API_KEY": "rocom-key", "WECOM_BOT_KEY": "bot-key"},
+            clear=True,
+        ):
+            settings = Settings.from_env()
+
+        self.assertEqual(settings.providers[0].type, "wecom_bot")
+        self.assertEqual(settings.providers[0].config["key"], "bot-key")
+
     def test_settings_from_env_ignores_incomplete_headless_provider(self):
         with patch.dict(
             "os.environ",

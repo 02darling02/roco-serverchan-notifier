@@ -8,7 +8,7 @@ import requests
 
 from . import web_auth
 from .config_store import ConfigStore
-from .provider_specs import PROVIDER_TYPES
+from .provider_specs import PROVIDER_TYPES, public_provider_types
 from .push import send_delivery, send_provider
 from .push_models import DeliveryOptions, NotificationMessage
 from .scheduler import parse_schedule_times
@@ -25,7 +25,7 @@ def build_state_payload(store: ConfigStore, scheduler: Any) -> dict[str, Any]:
     return {
         "config": settings.public_dict(),
         "config_issue": store.load_issue_dict(),
-        "provider_types": PROVIDER_TYPES,
+        "provider_types": public_provider_types(),
         "scheduler": scheduler.state.to_dict(),
         "auth_enabled": web_auth.auth_enabled(store),
         "now": beijing_now().isoformat(),

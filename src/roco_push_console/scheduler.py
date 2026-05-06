@@ -1,83 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
 from contextlib import suppress
 from collections.abc import Awaitable, Callable
-from datetime import datetime, time, timedelta
-from typing import Protocol
+from datetime import datetime
 
 from .app import RunResult, run
 from .config_store import ConfigStore
-from .settings import DEFAULT_SCHEDULE_TIMES, Settings
-from .time_utils import BEIJING_TZ, beijing_now, ensure_beijing_time
+from .schedule_policy import next_run_after, parse_schedule_times
+from .scheduler_state import SchedulerState, SettingsStore, StaticSettingsStore
+from .settings import Settings
+from .time_utils import beijing_now, ensure_beijing_time
 
 
 NowProvider = Callable[[], datetime]
 SleepFunc = Callable[[float], Awaitable[None]]
-
-
-class SettingsStore(Protocol):
-    def load(self) -> Settings: ...
-
-
-def parse_schedule_times(value: str | None) -> list[time]:
-    raw_value = (value or DEFAULT_SCHEDULE_TIMES).strip()
-    result: list[time] = []
-    for part in raw_value.split(","):
-        text = part.strip()
-        if not text:
-            continue
-        try:
-            hour_text, minute_text = text.split(":", 1)
-            hour = int(hour_text)
-            minute = int(minute_text)
-        except ValueError as exc:
-            raise ValueError(f"无效的定时时间: {text}") from exc
-
-        if not (0 <= hour <= 23 and 0 <= minute <= 59):
-            raise ValueError(f"无效的定时时间: {text}")
-        result.append(time(hour=hour, minute=minute, tzinfo=BEIJING_TZ))
-
-    if not result:
-        raise ValueError("SCHEDULE_TIMES 至少需要配置一个时间")
-    return sorted(result)
-
-
-def next_run_after(now: datetime, schedule_times: list[time]) -> datetime:
-    now = ensure_beijing_time(now)
-    today = now.date()
-
-    for schedule_time in schedule_times:
-        candidate = datetime.combine(today, schedule_time)
-        if candidate > now:
-            return candidate
-
-    return datetime.combine(today + timedelta(days=1), schedule_times[0])
-
-
-@dataclass
-class SchedulerState:
-    running: bool = False
-    in_progress: bool = False
-    next_run_at: datetime | None = None
-    last_started_at: datetime | None = None
-    last_finished_at: datetime | None = None
-    last_exit_code: int | None = None
-    last_message: str = "尚未执行"
-    last_push_results: list[dict[str, object]] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "running": self.running,
-            "in_progress": self.in_progress,
-            "next_run_at": self.next_run_at.isoformat() if self.next_run_at else None,
-            "last_started_at": self.last_started_at.isoformat() if self.last_started_at else None,
-            "last_finished_at": self.last_finished_at.isoformat() if self.last_finished_at else None,
-            "last_exit_code": self.last_exit_code,
-            "last_message": self.last_message,
-            "last_push_results": self.last_push_results,
-        }
 
 
 class SchedulerService:
@@ -222,14 +159,6 @@ class SchedulerService:
 
     def _now(self) -> datetime:
         return ensure_beijing_time(self._now_provider())
-
-
-class StaticSettingsStore:
-    def __init__(self, settings: Settings):
-        self._settings = settings
-
-    def load(self) -> Settings:
-        return self._settings
 
 
 async def run_scheduler(

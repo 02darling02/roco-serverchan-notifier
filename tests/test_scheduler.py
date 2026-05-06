@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -15,11 +16,19 @@ except ImportError:
 from roco_push_console import app as app_module
 from roco_push_console.config import ConfigStore
 from roco_push_console.push import DeliveryReport, PushResult
-from roco_push_console.scheduler import SchedulerService, next_run_after, parse_schedule_times
+from roco_push_console.scheduler import SchedulerService, SchedulerState, next_run_after, parse_schedule_times
 
 
 
 class SchedulerTests(RocoTestCase):
+    def test_scheduler_delegates_policy_and_state_modules(self):
+        policy = importlib.import_module("roco_push_console.schedule_policy")
+        state = importlib.import_module("roco_push_console.scheduler_state")
+
+        self.assertIs(parse_schedule_times, policy.parse_schedule_times)
+        self.assertIs(next_run_after, policy.next_run_after)
+        self.assertIs(SchedulerState, state.SchedulerState)
+
     def test_parse_schedule_times_sorts_times(self):
         times = parse_schedule_times("20:01,08:01,12:01")
 

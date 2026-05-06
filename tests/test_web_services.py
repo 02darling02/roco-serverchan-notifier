@@ -38,6 +38,19 @@ class WebServicesTests(RocoTestCase):
         self.assertIn("auth_enabled", payload)
         self.assertIn("now", payload)
 
+    def test_build_state_payload_hides_provider_env_metadata(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = ConfigStore(Path(temp_dir) / "config.json")
+            store.save(self.make_settings())
+            scheduler = SimpleNamespace(state=SimpleNamespace(to_dict=lambda: {"running": True}))
+
+            payload = build_state_payload(store, scheduler)
+
+        spec = payload["provider_types"]["serverchan"]
+        self.assertIn("fields", spec)
+        self.assertEqual(set(spec), {"label", "description", "fields"})
+
+
     def test_save_config_payload_validates_schedule_and_provider_type(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             store = ConfigStore(Path(temp_dir) / "config.json")

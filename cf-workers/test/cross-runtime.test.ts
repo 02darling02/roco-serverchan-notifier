@@ -6,6 +6,11 @@ import { deliverySummary } from "../src/push-delivery";
 import {
   providerRequiredFields,
   providerSecretFields,
+  providerEnvFields,
+  providerEnvBindingNames,
+  providerEnvId,
+  validateProviderManifest,
+  PROVIDER_TYPES,
 } from "../src/provider-specs";
 import { buildMerchantMarkdown } from "../src/rocom";
 import type { DeliveryReport } from "../src/types";
@@ -42,6 +47,42 @@ test("shared fixture keeps provider specs aligned with Python", () => {
       [...provider.required_fields].sort()
     );
   }
+});
+
+test("shared manifest keeps env mappings aligned with Python", () => {
+  for (const [providerType, spec] of Object.entries(PROVIDER_TYPES)) {
+    assert.equal(providerEnvId(providerType), spec.envId);
+    assert.deepEqual(providerEnvFields(providerType), spec.envVars);
+  }
+});
+
+test("provider env binding list is derived from manifest env vars", () => {
+  const expected = [
+    ...new Set(
+      Object.values(PROVIDER_TYPES).flatMap((spec) => Object.values(spec.envVars))
+    ),
+  ];
+
+  assert.deepEqual(providerEnvBindingNames(), expected);
+});
+
+test("provider manifest validation rejects env mappings without matching fields", () => {
+  assert.throws(
+    () =>
+      validateProviderManifest({
+        providers: [
+          {
+            type: "broken",
+            label: "Broken",
+            description: "Broken provider",
+            envId: "broken-env",
+            envVars: { token: "BROKEN_TOKEN" },
+            fields: [{ name: "other", label: "Other" }],
+          },
+        ],
+      }),
+    /envVars/
+  );
 });
 
 test("shared fixture keeps price markdown aligned with Python", () => {

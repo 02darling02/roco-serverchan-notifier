@@ -5,109 +5,433 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// src/provider-specs.ts
-var PROVIDER_TYPES = {
-  serverchan: {
-    label: "Server \u9171",
-    description: "\u901A\u8FC7 Server \u9171 SendKey \u63A8\u9001\u5230\u5FAE\u4FE1\u3002",
-    fields: [
-      { name: "sendkey", label: "SendKey", secret: true, required: true }
-    ]
-  },
-  pushplus: {
-    label: "PushPlus",
-    description: "\u901A\u8FC7 PushPlus token \u63A8\u9001\uFF0C\u9ED8\u8BA4\u4F7F\u7528 markdown \u6A21\u677F\u3002",
-    fields: [
-      { name: "token", label: "Token", secret: true, required: true },
-      { name: "topic", label: "\u7FA4\u7EC4\u7F16\u7801", required: false },
-      { name: "channel", label: "\u6E20\u9053", required: false }
-    ]
-  },
-  wecomchan: {
-    label: "Wecom \u9171 / \u4F01\u4E1A\u5FAE\u4FE1\u5E94\u7528",
-    description: "\u4F7F\u7528\u4F01\u4E1A\u5FAE\u4FE1\u5E94\u7528\u53C2\u6570\u83B7\u53D6 access_token \u540E\u53D1\u9001\u6D88\u606F\u3002",
-    fields: [
-      { name: "corpid", label: "CorpID", secret: true, required: true },
-      { name: "secret", label: "Secret", secret: true, required: true },
-      { name: "agentid", label: "AgentID", required: true },
-      { name: "touser", label: "\u63A5\u6536\u4EBA", required: true, default: "@all" }
-    ]
-  },
-  wecom_bot: {
-    label: "\u4F01\u4E1A\u5FAE\u4FE1\u7FA4\u673A\u5668\u4EBA",
-    description: "\u4F7F\u7528\u4F01\u4E1A\u5FAE\u4FE1\u7FA4\u673A\u5668\u4EBA webhook \u6216 key \u63A8\u9001 markdown\u3002",
-    fields: [
-      { name: "webhook", label: "Webhook", secret: true, required: false },
-      { name: "key", label: "Key", secret: true, required: false }
-    ]
-  },
-  wxpusher: {
-    label: "WxPusher",
-    description: "\u901A\u8FC7 WxPusher appToken \u63A8\u9001\u7ED9 UID \u6216\u4E3B\u9898\u3002",
-    fields: [
-      { name: "app_token", label: "AppToken", secret: true, required: true },
-      { name: "uids", label: "UID \u5217\u8868", required: false },
-      { name: "topic_ids", label: "Topic ID \u5217\u8868", required: false }
-    ]
-  },
-  bark: {
-    label: "Bark",
-    description: "\u901A\u8FC7 Bark server \u548C device key \u63A8\u9001\u5230 iOS\u3002",
-    fields: [
-      {
-        name: "server_url",
-        label: "Server URL",
-        required: true,
-        default: "https://api.day.app"
+// ../src/roco_push_console/shared/provider_manifest.json
+var provider_manifest_default = {
+  providers: [
+    {
+      type: "serverchan",
+      label: "Server \u9171",
+      description: "\u901A\u8FC7 Server \u9171 SendKey \u63A8\u9001\u5230\u5FAE\u4FE1\u3002",
+      envId: "serverchan-default",
+      envVars: {
+        sendkey: "SERVERCHAN_SENDKEY"
       },
-      { name: "device_key", label: "Device Key", secret: true, required: true },
-      { name: "group", label: "\u5206\u7EC4", required: false, default: "\u6D1B\u514B\u738B\u56FD" }
-    ]
-  },
-  dingtalk_bot: {
-    label: "\u9489\u9489\u7FA4\u673A\u5668\u4EBA",
-    description: "\u4F7F\u7528\u9489\u9489 webhook \u63A8\u9001 markdown\uFF0C\u53EF\u9009 secret \u52A0\u7B7E\u3002",
-    fields: [
-      { name: "webhook", label: "Webhook", secret: true, required: true },
-      { name: "secret", label: "Secret", secret: true, required: false }
-    ]
-  },
-  feishu_bot: {
-    label: "\u98DE\u4E66\u7FA4\u673A\u5668\u4EBA",
-    description: "\u4F7F\u7528\u98DE\u4E66 webhook \u63A8\u9001\u5BCC\u6587\u672C\uFF0C\u53EF\u9009 secret \u52A0\u7B7E\u3002",
-    fields: [
-      { name: "webhook", label: "Webhook", secret: true, required: true },
-      { name: "secret", label: "Secret", secret: true, required: false }
-    ]
-  },
-  ntfy: {
-    label: "ntfy",
-    description: "\u53D1\u5E03\u5230 ntfy topic\uFF0C\u53EF\u9009 bearer token\u3002",
-    fields: [
-      {
-        name: "base_url",
-        label: "Base URL",
-        required: true,
-        default: "https://ntfy.sh"
+      fields: [
+        {
+          name: "sendkey",
+          label: "SendKey",
+          secret: true,
+          required: true
+        }
+      ]
+    },
+    {
+      type: "pushplus",
+      label: "PushPlus",
+      description: "\u901A\u8FC7 PushPlus token \u63A8\u9001\uFF0C\u9ED8\u8BA4\u4F7F\u7528 markdown \u6A21\u677F\u3002",
+      envId: "pushplus-env",
+      envVars: {
+        token: "PUSHPLUS_TOKEN",
+        topic: "PUSHPLUS_TOPIC",
+        channel: "PUSHPLUS_CHANNEL"
       },
-      { name: "topic", label: "Topic", secret: true, required: true },
-      { name: "token", label: "Token", secret: true, required: false },
-      { name: "priority", label: "\u4F18\u5148\u7EA7", required: false, default: "default" },
-      { name: "tags", label: "\u6807\u7B7E", required: false }
-    ]
-  },
-  gotify: {
-    label: "Gotify",
-    description: "\u901A\u8FC7 Gotify app token \u63A8\u9001\u6D88\u606F\u3002",
-    fields: [
-      { name: "base_url", label: "Base URL", required: true },
-      { name: "app_token", label: "App Token", secret: true, required: true },
-      { name: "priority", label: "\u4F18\u5148\u7EA7", required: false, default: "5" }
-    ]
-  }
+      fields: [
+        {
+          name: "token",
+          label: "Token",
+          secret: true,
+          required: true
+        },
+        {
+          name: "topic",
+          label: "\u7FA4\u7EC4\u7F16\u7801",
+          required: false
+        },
+        {
+          name: "channel",
+          label: "\u6E20\u9053",
+          required: false
+        }
+      ]
+    },
+    {
+      type: "wecomchan",
+      label: "Wecom \u9171 / \u4F01\u4E1A\u5FAE\u4FE1\u5E94\u7528",
+      description: "\u4F7F\u7528\u4F01\u4E1A\u5FAE\u4FE1\u5E94\u7528\u53C2\u6570\u83B7\u53D6 access_token \u540E\u53D1\u9001\u6D88\u606F\u3002",
+      envId: "wecomchan-env",
+      envVars: {
+        corpid: "WECOM_CORPID",
+        secret: "WECOM_SECRET",
+        agentid: "WECOM_AGENTID",
+        touser: "WECOM_TOUSER"
+      },
+      fields: [
+        {
+          name: "corpid",
+          label: "CorpID",
+          secret: true,
+          required: true
+        },
+        {
+          name: "secret",
+          label: "Secret",
+          secret: true,
+          required: true
+        },
+        {
+          name: "agentid",
+          label: "AgentID",
+          required: true
+        },
+        {
+          name: "touser",
+          label: "\u63A5\u6536\u4EBA",
+          required: true,
+          default: "@all"
+        }
+      ]
+    },
+    {
+      type: "wecom_bot",
+      label: "\u4F01\u4E1A\u5FAE\u4FE1\u7FA4\u673A\u5668\u4EBA",
+      description: "\u4F7F\u7528\u4F01\u4E1A\u5FAE\u4FE1\u7FA4\u673A\u5668\u4EBA webhook \u6216 key \u63A8\u9001 markdown\u3002",
+      envId: "wecom-bot-env",
+      envVars: {
+        webhook: "WECOM_BOT_WEBHOOK",
+        key: "WECOM_BOT_KEY"
+      },
+      fields: [
+        {
+          name: "webhook",
+          label: "Webhook",
+          secret: true,
+          required: false
+        },
+        {
+          name: "key",
+          label: "Key",
+          secret: true,
+          required: false
+        }
+      ]
+    },
+    {
+      type: "wxpusher",
+      label: "WxPusher",
+      description: "\u901A\u8FC7 WxPusher appToken \u63A8\u9001\u7ED9 UID \u6216\u4E3B\u9898\u3002",
+      envId: "wxpusher-env",
+      envVars: {
+        app_token: "WXPUSHER_APP_TOKEN",
+        uids: "WXPUSHER_UIDS",
+        topic_ids: "WXPUSHER_TOPIC_IDS"
+      },
+      fields: [
+        {
+          name: "app_token",
+          label: "AppToken",
+          secret: true,
+          required: true
+        },
+        {
+          name: "uids",
+          label: "UID \u5217\u8868",
+          required: false
+        },
+        {
+          name: "topic_ids",
+          label: "Topic ID \u5217\u8868",
+          required: false
+        }
+      ]
+    },
+    {
+      type: "bark",
+      label: "Bark",
+      description: "\u901A\u8FC7 Bark server \u548C device key \u63A8\u9001\u5230 iOS\u3002",
+      envId: "bark-env",
+      envVars: {
+        server_url: "BARK_SERVER_URL",
+        device_key: "BARK_DEVICE_KEY",
+        group: "BARK_GROUP"
+      },
+      fields: [
+        {
+          name: "server_url",
+          label: "Server URL",
+          required: true,
+          default: "https://api.day.app"
+        },
+        {
+          name: "device_key",
+          label: "Device Key",
+          secret: true,
+          required: true
+        },
+        {
+          name: "group",
+          label: "\u5206\u7EC4",
+          required: false,
+          default: "\u6D1B\u514B\u738B\u56FD"
+        }
+      ]
+    },
+    {
+      type: "dingtalk_bot",
+      label: "\u9489\u9489\u7FA4\u673A\u5668\u4EBA",
+      description: "\u4F7F\u7528\u9489\u9489 webhook \u63A8\u9001 markdown\uFF0C\u53EF\u9009 secret \u52A0\u7B7E\u3002",
+      envId: "dingtalk-env",
+      envVars: {
+        webhook: "DINGTALK_WEBHOOK",
+        secret: "DINGTALK_SECRET"
+      },
+      fields: [
+        {
+          name: "webhook",
+          label: "Webhook",
+          secret: true,
+          required: true
+        },
+        {
+          name: "secret",
+          label: "Secret",
+          secret: true,
+          required: false
+        }
+      ]
+    },
+    {
+      type: "feishu_bot",
+      label: "\u98DE\u4E66\u7FA4\u673A\u5668\u4EBA",
+      description: "\u4F7F\u7528\u98DE\u4E66 webhook \u63A8\u9001\u5BCC\u6587\u672C\uFF0C\u53EF\u9009 secret \u52A0\u7B7E\u3002",
+      envId: "feishu-env",
+      envVars: {
+        webhook: "FEISHU_WEBHOOK",
+        secret: "FEISHU_SECRET"
+      },
+      fields: [
+        {
+          name: "webhook",
+          label: "Webhook",
+          secret: true,
+          required: true
+        },
+        {
+          name: "secret",
+          label: "Secret",
+          secret: true,
+          required: false
+        }
+      ]
+    },
+    {
+      type: "ntfy",
+      label: "ntfy",
+      description: "\u53D1\u5E03\u5230 ntfy topic\uFF0C\u53EF\u9009 bearer token\u3002",
+      envId: "ntfy-env",
+      envVars: {
+        base_url: "NTFY_BASE_URL",
+        topic: "NTFY_TOPIC",
+        token: "NTFY_TOKEN",
+        priority: "NTFY_PRIORITY",
+        tags: "NTFY_TAGS"
+      },
+      fields: [
+        {
+          name: "base_url",
+          label: "Base URL",
+          required: true,
+          default: "https://ntfy.sh"
+        },
+        {
+          name: "topic",
+          label: "Topic",
+          secret: true,
+          required: true
+        },
+        {
+          name: "token",
+          label: "Token",
+          secret: true,
+          required: false
+        },
+        {
+          name: "priority",
+          label: "\u4F18\u5148\u7EA7",
+          required: false,
+          default: "default"
+        },
+        {
+          name: "tags",
+          label: "\u6807\u7B7E",
+          required: false
+        }
+      ]
+    },
+    {
+      type: "gotify",
+      label: "Gotify",
+      description: "\u901A\u8FC7 Gotify app token \u63A8\u9001\u6D88\u606F\u3002",
+      envId: "gotify-env",
+      envVars: {
+        base_url: "GOTIFY_BASE_URL",
+        app_token: "GOTIFY_APP_TOKEN",
+        priority: "GOTIFY_PRIORITY"
+      },
+      fields: [
+        {
+          name: "base_url",
+          label: "Base URL",
+          required: true
+        },
+        {
+          name: "app_token",
+          label: "App Token",
+          secret: true,
+          required: true
+        },
+        {
+          name: "priority",
+          label: "\u4F18\u5148\u7EA7",
+          required: false,
+          default: "5"
+        }
+      ]
+    }
+  ]
 };
+
+// src/provider-specs.ts
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+__name(isRecord, "isRecord");
+function validateProviderManifest(value) {
+  if (!isRecord(value)) {
+    throw new Error("Invalid provider manifest: root must be an object");
+  }
+  const providersValue = value.providers;
+  if (!Array.isArray(providersValue)) {
+    throw new Error("Invalid provider manifest: providers must be an array");
+  }
+  const providers = [];
+  const seenTypes = /* @__PURE__ */ new Set();
+  providersValue.forEach((providerValue, providerIndex) => {
+    if (!isRecord(providerValue)) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}] must be an object`);
+    }
+    const { type, label, description, envId, envVars, fields } = providerValue;
+    if (typeof type !== "string" || !type.trim()) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].type must be a non-empty string`);
+    }
+    if (seenTypes.has(type)) {
+      throw new Error(`Invalid provider manifest: duplicate provider type ${type}`);
+    }
+    seenTypes.add(type);
+    if (typeof label !== "string" || !label.trim()) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].label must be a non-empty string`);
+    }
+    if (typeof description !== "string" || !description.trim()) {
+      throw new Error(
+        `Invalid provider manifest: providers[${providerIndex}].description must be a non-empty string`
+      );
+    }
+    if (typeof envId !== "string" || !envId.trim()) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].envId must be a non-empty string`);
+    }
+    if (!isRecord(envVars)) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].envVars must be an object`);
+    }
+    if (!Array.isArray(fields)) {
+      throw new Error(`Invalid provider manifest: providers[${providerIndex}].fields must be an array`);
+    }
+    const fieldNames = /* @__PURE__ */ new Set();
+    const normalizedFields = fields.map((fieldValue, fieldIndex) => {
+      if (!isRecord(fieldValue)) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}] must be an object`
+        );
+      }
+      const { name, label: label2, secret, required, default: defaultValue } = fieldValue;
+      if (typeof name !== "string" || !name.trim()) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].name must be a non-empty string`
+        );
+      }
+      if (typeof label2 !== "string" || !label2.trim()) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].label must be a non-empty string`
+        );
+      }
+      if (fieldNames.has(name)) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}] contains duplicate field ${name}`
+        );
+      }
+      fieldNames.add(name);
+      if (secret !== void 0 && typeof secret !== "boolean") {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].secret must be a boolean`
+        );
+      }
+      if (required !== void 0 && typeof required !== "boolean") {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].required must be a boolean`
+        );
+      }
+      if (defaultValue !== void 0 && typeof defaultValue !== "string") {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].fields[${fieldIndex}].default must be a string`
+        );
+      }
+      return {
+        name,
+        label: label2,
+        ...secret !== void 0 ? { secret } : {},
+        ...required !== void 0 ? { required } : {},
+        ...defaultValue !== void 0 ? { default: defaultValue } : {}
+      };
+    });
+    const normalizedEnvVars = {};
+    for (const [envName, envValue] of Object.entries(envVars)) {
+      if (typeof envName !== "string" || !envName.trim()) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].envVars contains an empty key`
+        );
+      }
+      if (typeof envValue !== "string" || !envValue.trim()) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].envVars.${envName} must be a non-empty string`
+        );
+      }
+      if (!fieldNames.has(envName)) {
+        throw new Error(
+          `Invalid provider manifest: providers[${providerIndex}].envVars.${envName} is not declared in fields`
+        );
+      }
+      normalizedEnvVars[envName] = envValue;
+    }
+    providers.push({
+      type,
+      label,
+      description,
+      envId,
+      envVars: normalizedEnvVars,
+      fields: normalizedFields
+    });
+  });
+  return { providers };
+}
+__name(validateProviderManifest, "validateProviderManifest");
+var manifest = validateProviderManifest(provider_manifest_default);
+var PROVIDER_TYPES = Object.fromEntries(
+  manifest.providers.map(({ type, ...spec }) => [type, spec])
+);
+function providerSpec(providerType) {
+  return PROVIDER_TYPES[providerType];
+}
+__name(providerSpec, "providerSpec");
 function providerSecretFields(providerType) {
-  const spec = PROVIDER_TYPES[providerType];
+  const spec = providerSpec(providerType);
   if (!spec) return /* @__PURE__ */ new Set();
   return new Set(
     spec.fields.filter((f) => f.secret).map((f) => f.name)
@@ -115,95 +439,33 @@ function providerSecretFields(providerType) {
 }
 __name(providerSecretFields, "providerSecretFields");
 function providerRequiredFields(providerType) {
-  const spec = PROVIDER_TYPES[providerType];
+  const spec = providerSpec(providerType);
   if (!spec) return /* @__PURE__ */ new Set();
   return new Set(
     spec.fields.filter((f) => f.required).map((f) => f.name)
   );
 }
 __name(providerRequiredFields, "providerRequiredFields");
+function providerFieldDefault(providerType, fieldName) {
+  const spec = providerSpec(providerType);
+  const field = spec?.fields.find((item) => item.name === fieldName);
+  return field && Object.prototype.hasOwnProperty.call(field, "default") ? field.default : void 0;
+}
+__name(providerFieldDefault, "providerFieldDefault");
+function providerEnvFields(providerType) {
+  const spec = providerSpec(providerType);
+  if (!spec) return {};
+  return { ...spec.envVars };
+}
+__name(providerEnvFields, "providerEnvFields");
+function providerEnvId(providerType) {
+  const spec = providerSpec(providerType);
+  return spec?.envId || `${providerType}-env`;
+}
+__name(providerEnvId, "providerEnvId");
 
 // src/config.ts
 var DEFAULT_GAME_API_URL = "https://wegame.shallow.ink/api/v1/games/rocom/merchant/info";
-var ENV_PROVIDER_MAPPINGS = [
-  {
-    type: "serverchan",
-    envVars: { sendkey: "SERVERCHAN_SENDKEY" },
-    envId: "serverchan-default"
-  },
-  {
-    type: "pushplus",
-    envVars: {
-      token: "PUSHPLUS_TOKEN",
-      topic: "PUSHPLUS_TOPIC",
-      channel: "PUSHPLUS_CHANNEL"
-    },
-    envId: "pushplus-env"
-  },
-  {
-    type: "wecomchan",
-    envVars: {
-      corpid: "WECOM_CORPID",
-      secret: "WECOM_SECRET",
-      agentid: "WECOM_AGENTID",
-      touser: "WECOM_TOUSER"
-    },
-    envId: "wecomchan-env"
-  },
-  {
-    type: "wecom_bot",
-    envVars: { webhook: "WECOM_BOT_WEBHOOK", key: "WECOM_BOT_KEY" },
-    envId: "wecom-bot-env"
-  },
-  {
-    type: "wxpusher",
-    envVars: {
-      app_token: "WXPUSHER_APP_TOKEN",
-      uids: "WXPUSHER_UIDS",
-      topic_ids: "WXPUSHER_TOPIC_IDS"
-    },
-    envId: "wxpusher-env"
-  },
-  {
-    type: "bark",
-    envVars: {
-      server_url: "BARK_SERVER_URL",
-      device_key: "BARK_DEVICE_KEY",
-      group: "BARK_GROUP"
-    },
-    envId: "bark-env"
-  },
-  {
-    type: "dingtalk_bot",
-    envVars: { webhook: "DINGTALK_WEBHOOK", secret: "DINGTALK_SECRET" },
-    envId: "dingtalk-env"
-  },
-  {
-    type: "feishu_bot",
-    envVars: { webhook: "FEISHU_WEBHOOK", secret: "FEISHU_SECRET" },
-    envId: "feishu-env"
-  },
-  {
-    type: "ntfy",
-    envVars: {
-      base_url: "NTFY_BASE_URL",
-      topic: "NTFY_TOPIC",
-      token: "NTFY_TOKEN",
-      priority: "NTFY_PRIORITY",
-      tags: "NTFY_TAGS"
-    },
-    envId: "ntfy-env"
-  },
-  {
-    type: "gotify",
-    envVars: {
-      base_url: "GOTIFY_BASE_URL",
-      app_token: "GOTIFY_APP_TOKEN",
-      priority: "GOTIFY_PRIORITY"
-    },
-    envId: "gotify-env"
-  }
-];
 function envStr(env, key) {
   return (env[key] || "").trim();
 }
@@ -225,33 +487,30 @@ function envCsv(env, key) {
   return envStr(env, key).split(",").map((item) => item.trim()).filter(Boolean);
 }
 __name(envCsv, "envCsv");
-function buildProviderFromEnv(env, mapping) {
-  const spec = PROVIDER_TYPES[mapping.type];
+function buildProviderFromEnv(env, providerType) {
+  const spec = PROVIDER_TYPES[providerType];
   if (!spec) return null;
   const config = {};
   let hasExplicitValue = false;
+  const envVars = providerEnvFields(providerType);
   for (const field of spec.fields) {
-    const envKey = mapping.envVars[field.name];
+    const envKey = envVars[field.name];
     const value = envKey ? envStr(env, envKey) : "";
     if (value) {
       config[field.name] = value;
       hasExplicitValue = true;
-    } else if (field.default) {
+    } else if (Object.prototype.hasOwnProperty.call(field, "default") && field.default !== void 0) {
       config[field.name] = field.default;
     }
   }
-  if (mapping.type === "wecom_bot") {
-    if (!config.webhook && !config.key) return null;
-  } else {
-    if (!hasExplicitValue) return null;
-    const requiredFields = spec.fields.filter((f) => f.required);
-    for (const field of requiredFields) {
-      if (!(config[field.name] || "").trim()) return null;
-    }
+  if (!hasExplicitValue) return null;
+  const requiredFields = spec.fields.filter((f) => f.required);
+  for (const field of requiredFields) {
+    if (!(config[field.name] || "").trim()) return null;
   }
   return {
-    id: mapping.envId,
-    type: mapping.type,
+    id: providerEnvId(providerType),
+    type: providerType,
     name: spec.label,
     enabled: true,
     config
@@ -260,8 +519,8 @@ function buildProviderFromEnv(env, mapping) {
 __name(buildProviderFromEnv, "buildProviderFromEnv");
 function loadConfig(env) {
   const providers = [];
-  for (const mapping of ENV_PROVIDER_MAPPINGS) {
-    const provider = buildProviderFromEnv(env, mapping);
+  for (const providerType of Object.keys(PROVIDER_TYPES)) {
+    const provider = buildProviderFromEnv(env, providerType);
     if (provider) providers.push(provider);
   }
   const deliveryMode = envStr(env, "DELIVERY_MODE") || "all";
@@ -1449,6 +1708,184 @@ async function postJson(provider, url, payload, timeoutSec, options) {
 }
 __name(postJson, "postJson");
 
+// src/push-provider-senders/common.ts
+function splitCsv(value) {
+  if (!value) return [];
+  return value.split(",").map((s) => s.trim()).filter(Boolean);
+}
+__name(splitCsv, "splitCsv");
+function providerConfigText(provider, fieldName) {
+  return (provider.config[fieldName] || providerFieldDefault(provider.type, fieldName) || "").trim();
+}
+__name(providerConfigText, "providerConfigText");
+
+// src/push-provider-senders/token.ts
+async function sendServerChan(provider, message, timeoutSec) {
+  const sendkey = provider.config.sendkey;
+  const url = `https://sctapi.ftqq.com/${sendkey}.send`;
+  const body = new URLSearchParams({
+    title: message.title,
+    desp: message.markdown
+  });
+  try {
+    const resp = await fetchWithTimeout(
+      url,
+      { method: "POST", body },
+      timeoutSec
+    );
+    const successCodes = /* @__PURE__ */ new Set([0, "0", null, void 0]);
+    const { payload, text } = await readResponsePayload(resp);
+    return resultFromParsedResponse(provider, resp, payload, text, successCodes);
+  } catch (err) {
+    return providerErrorResult(provider, err);
+  }
+}
+__name(sendServerChan, "sendServerChan");
+async function sendPushPlus(provider, message, timeoutSec) {
+  const payload = {
+    token: provider.config.token,
+    title: message.title,
+    content: message.markdown,
+    template: "markdown"
+  };
+  for (const key of ["topic", "channel"]) {
+    const v = (provider.config[key] || "").trim();
+    if (v) payload[key] = v;
+  }
+  return postJson(provider, "https://www.pushplus.plus/send", payload, timeoutSec, {
+    successCodes: /* @__PURE__ */ new Set([200, "200", 0, "0"])
+  });
+}
+__name(sendPushPlus, "sendPushPlus");
+async function sendWxPusher(provider, message, timeoutSec) {
+  const payload = {
+    appToken: provider.config.app_token,
+    content: message.markdown,
+    summary: message.title,
+    contentType: 3
+  };
+  const uids = splitCsv(provider.config.uids);
+  const topicIds = splitCsv(provider.config.topic_ids);
+  if (uids.length > 0) payload.uids = uids;
+  if (topicIds.length > 0) {
+    payload.topicIds = topicIds.map((id) => /^\d+$/.test(id) ? parseInt(id, 10) : id);
+  }
+  return postJson(
+    provider,
+    "https://wxpusher.zjiecode.com/api/send/message",
+    payload,
+    timeoutSec,
+    { successCodes: /* @__PURE__ */ new Set([1e3, "1000", 0, "0"]) }
+  );
+}
+__name(sendWxPusher, "sendWxPusher");
+async function sendBark(provider, message, timeoutSec) {
+  const serverUrl = providerConfigText(provider, "server_url").replace(/\/$/, "");
+  const url = `${serverUrl}/${provider.config.device_key}`;
+  const payload = {
+    title: message.title,
+    body: `${message.body}
+
+${message.markdown}`
+  };
+  const group = providerConfigText(provider, "group");
+  if (group) payload.group = group;
+  return postJson(provider, url, payload, timeoutSec, {
+    successCodes: /* @__PURE__ */ new Set([200, "200", 0, "0"])
+  });
+}
+__name(sendBark, "sendBark");
+async function sendNtfy(provider, message, timeoutSec) {
+  const baseUrl = providerConfigText(provider, "base_url").replace(/\/$/, "");
+  const url = `${baseUrl}/${provider.config.topic}`;
+  const headers = {
+    Title: message.title,
+    Markdown: "yes"
+  };
+  for (const [cfgKey, headerName] of [
+    ["priority", "Priority"],
+    ["tags", "Tags"]
+  ]) {
+    const v = providerConfigText(provider, cfgKey);
+    if (v) headers[headerName] = v;
+  }
+  const token = providerConfigText(provider, "token");
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  try {
+    const resp = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers,
+        body: message.markdown
+      },
+      timeoutSec
+    );
+    const success = resp.status >= 200 && resp.status < 300;
+    const text = (await resp.text()).slice(0, 200) || resp.statusText;
+    return {
+      providerId: provider.id,
+      providerName: provider.name,
+      providerType: provider.type,
+      success,
+      message: text,
+      statusCode: resp.status
+    };
+  } catch (err) {
+    return {
+      providerId: provider.id,
+      providerName: provider.name,
+      providerType: provider.type,
+      success: false,
+      message: String(err),
+      statusCode: null
+    };
+  }
+}
+__name(sendNtfy, "sendNtfy");
+async function sendGotify(provider, message, timeoutSec) {
+  const baseUrl = (provider.config.base_url || "").replace(/\/$/, "");
+  const appToken = encodeURIComponent(provider.config.app_token);
+  const url = `${baseUrl}/message?token=${appToken}`;
+  const priority = parseInt(providerConfigText(provider, "priority"), 10) || 5;
+  const payload = {
+    title: message.title,
+    message: message.markdown,
+    priority
+  };
+  try {
+    const resp = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      },
+      timeoutSec
+    );
+    const success = resp.status >= 200 && resp.status < 300;
+    const text = (await resp.text()).slice(0, 200) || resp.statusText;
+    return {
+      providerId: provider.id,
+      providerName: provider.name,
+      providerType: provider.type,
+      success,
+      message: text,
+      statusCode: resp.status
+    };
+  } catch (err) {
+    return {
+      providerId: provider.id,
+      providerName: provider.name,
+      providerType: provider.type,
+      success: false,
+      message: String(err),
+      statusCode: null
+    };
+  }
+}
+__name(sendGotify, "sendGotify");
+
 // src/push-provider-auth.ts
 var wecomTokenCache = /* @__PURE__ */ new Map();
 async function getWecomToken(corpid, secret, timeoutSec) {
@@ -1516,55 +1953,46 @@ ${secret}`;
 }
 __name(feishuSign, "feishuSign");
 
-// src/push-providers.ts
-function splitCsv(value) {
-  if (!value) return [];
-  return value.split(",").map((s) => s.trim()).filter(Boolean);
-}
-__name(splitCsv, "splitCsv");
-function missingRequired2(provider) {
-  return [...providerRequiredFields(provider.type)].filter(
-    (name) => !(provider.config[name] || "").trim()
+// src/push-provider-senders/webhook.ts
+async function sendDingTalkBot(provider, message, timeoutSec) {
+  const webhook = await appendDingTalkSign(
+    provider.config.webhook,
+    provider.config.secret || ""
   );
-}
-__name(missingRequired2, "missingRequired");
-async function sendServerChan(provider, message, timeoutSec) {
-  const sendkey = provider.config.sendkey;
-  const url = `https://sctapi.ftqq.com/${sendkey}.send`;
-  const body = new URLSearchParams({
-    title: message.title,
-    desp: message.markdown
-  });
-  try {
-    const resp = await fetchWithTimeout(
-      url,
-      { method: "POST", body },
-      timeoutSec
-    );
-    const successCodes = /* @__PURE__ */ new Set([0, "0", null, void 0]);
-    const { payload, text } = await readResponsePayload(resp);
-    return resultFromParsedResponse(provider, resp, payload, text, successCodes);
-  } catch (err) {
-    return providerErrorResult(provider, err);
-  }
-}
-__name(sendServerChan, "sendServerChan");
-async function sendPushPlus(provider, message, timeoutSec) {
   const payload = {
-    token: provider.config.token,
-    title: message.title,
-    content: message.markdown,
-    template: "markdown"
+    msgtype: "markdown",
+    markdown: { title: message.title, text: message.markdown }
   };
-  for (const key of ["topic", "channel"]) {
-    const v = (provider.config[key] || "").trim();
-    if (v) payload[key] = v;
-  }
-  return postJson(provider, "https://www.pushplus.plus/send", payload, timeoutSec, {
-    successCodes: /* @__PURE__ */ new Set([200, "200", 0, "0"])
-  });
+  return postJson(provider, webhook, payload, timeoutSec);
 }
-__name(sendPushPlus, "sendPushPlus");
+__name(sendDingTalkBot, "sendDingTalkBot");
+async function sendFeishuBot(provider, message, timeoutSec) {
+  const payload = {
+    msg_type: "post",
+    content: {
+      post: {
+        zh_cn: {
+          title: message.title,
+          content: [
+            [{ tag: "text", text: `${message.body}
+
+${message.markdown}` }]
+          ]
+        }
+      }
+    }
+  };
+  const secret = (provider.config.secret || "").trim();
+  if (secret) {
+    const timestamp = Math.floor(Date.now() / 1e3).toString();
+    payload.timestamp = timestamp;
+    payload.sign = await feishuSign(secret, timestamp);
+  }
+  return postJson(provider, provider.config.webhook, payload, timeoutSec);
+}
+__name(sendFeishuBot, "sendFeishuBot");
+
+// src/push-provider-senders/wecom.ts
 async function sendWecomChan(provider, message, timeoutSec) {
   try {
     const token = await getWecomToken(
@@ -1615,177 +2043,8 @@ async function sendWecomBot(provider, message, timeoutSec) {
   return postJson(provider, webhook, payload, timeoutSec);
 }
 __name(sendWecomBot, "sendWecomBot");
-async function sendWxPusher(provider, message, timeoutSec) {
-  const payload = {
-    appToken: provider.config.app_token,
-    content: message.markdown,
-    summary: message.title,
-    contentType: 3
-  };
-  const uids = splitCsv(provider.config.uids);
-  const topicIds = splitCsv(provider.config.topic_ids);
-  if (uids.length > 0) payload.uids = uids;
-  if (topicIds.length > 0) {
-    payload.topicIds = topicIds.map((id) => /^\d+$/.test(id) ? parseInt(id, 10) : id);
-  }
-  return postJson(
-    provider,
-    "https://wxpusher.zjiecode.com/api/send/message",
-    payload,
-    timeoutSec,
-    { successCodes: /* @__PURE__ */ new Set([1e3, "1000", 0, "0"]) }
-  );
-}
-__name(sendWxPusher, "sendWxPusher");
-async function sendBark(provider, message, timeoutSec) {
-  const serverUrl = (provider.config.server_url || "https://api.day.app").replace(
-    /\/$/,
-    ""
-  );
-  const url = `${serverUrl}/${provider.config.device_key}`;
-  const payload = {
-    title: message.title,
-    body: `${message.body}
 
-${message.markdown}`
-  };
-  const group = (provider.config.group || "").trim();
-  if (group) payload.group = group;
-  return postJson(provider, url, payload, timeoutSec, {
-    successCodes: /* @__PURE__ */ new Set([200, "200", 0, "0"])
-  });
-}
-__name(sendBark, "sendBark");
-async function sendDingTalkBot(provider, message, timeoutSec) {
-  const webhook = await appendDingTalkSign(
-    provider.config.webhook,
-    provider.config.secret || ""
-  );
-  const payload = {
-    msgtype: "markdown",
-    markdown: { title: message.title, text: message.markdown }
-  };
-  return postJson(provider, webhook, payload, timeoutSec);
-}
-__name(sendDingTalkBot, "sendDingTalkBot");
-async function sendFeishuBot(provider, message, timeoutSec) {
-  const payload = {
-    msg_type: "post",
-    content: {
-      post: {
-        zh_cn: {
-          title: message.title,
-          content: [
-            [{ tag: "text", text: `${message.body}
-
-${message.markdown}` }]
-          ]
-        }
-      }
-    }
-  };
-  const secret = (provider.config.secret || "").trim();
-  if (secret) {
-    const timestamp = Math.floor(Date.now() / 1e3).toString();
-    payload.timestamp = timestamp;
-    payload.sign = await feishuSign(secret, timestamp);
-  }
-  return postJson(provider, provider.config.webhook, payload, timeoutSec);
-}
-__name(sendFeishuBot, "sendFeishuBot");
-async function sendNtfy(provider, message, timeoutSec) {
-  const baseUrl = (provider.config.base_url || "https://ntfy.sh").replace(
-    /\/$/,
-    ""
-  );
-  const url = `${baseUrl}/${provider.config.topic}`;
-  const headers = {
-    Title: message.title,
-    Markdown: "yes"
-  };
-  for (const [cfgKey, headerName] of [
-    ["priority", "Priority"],
-    ["tags", "Tags"]
-  ]) {
-    const v = (provider.config[cfgKey] || "").trim();
-    if (v) headers[headerName] = v;
-  }
-  const token = (provider.config.token || "").trim();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  try {
-    const resp = await fetchWithTimeout(
-      url,
-      {
-        method: "POST",
-        headers,
-        body: message.markdown
-      },
-      timeoutSec
-    );
-    const success = resp.status >= 200 && resp.status < 300;
-    const text = (await resp.text()).slice(0, 200) || resp.statusText;
-    return {
-      providerId: provider.id,
-      providerName: provider.name,
-      providerType: provider.type,
-      success,
-      message: text,
-      statusCode: resp.status
-    };
-  } catch (err) {
-    return {
-      providerId: provider.id,
-      providerName: provider.name,
-      providerType: provider.type,
-      success: false,
-      message: String(err),
-      statusCode: null
-    };
-  }
-}
-__name(sendNtfy, "sendNtfy");
-async function sendGotify(provider, message, timeoutSec) {
-  const baseUrl = (provider.config.base_url || "").replace(/\/$/, "");
-  const appToken = encodeURIComponent(provider.config.app_token);
-  const url = `${baseUrl}/message?token=${appToken}`;
-  const priority = parseInt(provider.config.priority || "5", 10) || 5;
-  const payload = {
-    title: message.title,
-    message: message.markdown,
-    priority
-  };
-  try {
-    const resp = await fetchWithTimeout(
-      url,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      },
-      timeoutSec
-    );
-    const success = resp.status >= 200 && resp.status < 300;
-    const text = (await resp.text()).slice(0, 200) || resp.statusText;
-    return {
-      providerId: provider.id,
-      providerName: provider.name,
-      providerType: provider.type,
-      success,
-      message: text,
-      statusCode: resp.status
-    };
-  } catch (err) {
-    return {
-      providerId: provider.id,
-      providerName: provider.name,
-      providerType: provider.type,
-      success: false,
-      message: String(err),
-      statusCode: null
-    };
-  }
-}
-__name(sendGotify, "sendGotify");
+// src/push-provider-senders/registry.ts
 var PROVIDER_SENDERS = {
   serverchan: sendServerChan,
   pushplus: sendPushPlus,
@@ -1798,6 +2057,18 @@ var PROVIDER_SENDERS = {
   ntfy: sendNtfy,
   gotify: sendGotify
 };
+
+// src/push-providers.ts
+function configuredOrDefault(provider, fieldName) {
+  return (provider.config[fieldName] || providerFieldDefault(provider.type, fieldName) || "").trim();
+}
+__name(configuredOrDefault, "configuredOrDefault");
+function missingRequired2(provider) {
+  return [...providerRequiredFields(provider.type)].filter(
+    (name) => !configuredOrDefault(provider, name)
+  );
+}
+__name(missingRequired2, "missingRequired");
 async function sendProvider(provider, message, timeoutSec) {
   const missing = missingRequired2(provider);
   if (missing.length > 0) {

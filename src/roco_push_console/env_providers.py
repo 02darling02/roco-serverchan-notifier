@@ -1,64 +1,17 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Collection
 from typing import Any
 
-from .provider_specs import PROVIDER_TYPES, provider_secret_fields
+from .provider_specs import (
+    PROVIDER_TYPES,
+    provider_env_fields,
+    provider_env_id,
+    provider_required_fields,
+    provider_secret_fields,
+)
 from .push_models import ProviderConfig
-
-
-ENV_PROVIDER_FIELDS: dict[str, dict[str, str]] = {
-    "serverchan": {"sendkey": "SERVERCHAN_SENDKEY"},
-    "pushplus": {
-        "token": "PUSHPLUS_TOKEN",
-        "topic": "PUSHPLUS_TOPIC",
-        "channel": "PUSHPLUS_CHANNEL",
-    },
-    "wecomchan": {
-        "corpid": "WECOM_CORPID",
-        "secret": "WECOM_SECRET",
-        "agentid": "WECOM_AGENTID",
-        "touser": "WECOM_TOUSER",
-    },
-    "wecom_bot": {"webhook": "WECOM_BOT_WEBHOOK", "key": "WECOM_BOT_KEY"},
-    "wxpusher": {
-        "app_token": "WXPUSHER_APP_TOKEN",
-        "uids": "WXPUSHER_UIDS",
-        "topic_ids": "WXPUSHER_TOPIC_IDS",
-    },
-    "bark": {
-        "server_url": "BARK_SERVER_URL",
-        "device_key": "BARK_DEVICE_KEY",
-        "group": "BARK_GROUP",
-    },
-    "dingtalk_bot": {"webhook": "DINGTALK_WEBHOOK", "secret": "DINGTALK_SECRET"},
-    "feishu_bot": {"webhook": "FEISHU_WEBHOOK", "secret": "FEISHU_SECRET"},
-    "ntfy": {
-        "base_url": "NTFY_BASE_URL",
-        "topic": "NTFY_TOPIC",
-        "token": "NTFY_TOKEN",
-        "priority": "NTFY_PRIORITY",
-        "tags": "NTFY_TAGS",
-    },
-    "gotify": {
-        "base_url": "GOTIFY_BASE_URL",
-        "app_token": "GOTIFY_APP_TOKEN",
-        "priority": "GOTIFY_PRIORITY",
-    },
-}
-
-ENV_PROVIDER_IDS = {
-    "serverchan": "serverchan-default",
-    "pushplus": "pushplus-env",
-    "wecomchan": "wecomchan-env",
-    "wecom_bot": "wecom-bot-env",
-    "wxpusher": "wxpusher-env",
-    "bark": "bark-env",
-    "dingtalk_bot": "dingtalk-env",
-    "feishu_bot": "feishu-env",
-    "ntfy": "ntfy-env",
-    "gotify": "gotify-env",
-}
 
 
 def env_text(name: str) -> str:
@@ -78,7 +31,7 @@ def provider_order(providers: list[ProviderConfig]) -> list[str]:
 
 def env_providers() -> list[ProviderConfig]:
     providers: list[ProviderConfig] = []
-    for provider_type in ENV_PROVIDER_FIELDS:
+    for provider_type in PROVIDER_TYPES:
         provider = env_provider(provider_type)
         if provider:
             providers.append(provider)
@@ -87,13 +40,13 @@ def env_providers() -> list[ProviderConfig]:
 
 def env_provider(provider_type: str) -> ProviderConfig | None:
     spec = PROVIDER_TYPES.get(provider_type, {})
-    config, has_explicit_value = env_provider_config(provider_type, spec)
-    required = provider_required_fields(spec)
+    config, has_explicit_value = env_provider_config(provider_type)
+    required = provider_required_fields(provider_type)
     if not env_provider_is_complete(provider_type, config, has_explicit_value, required):
         return None
 
     return ProviderConfig(
-        id=ENV_PROVIDER_IDS[provider_type],
+        id=provider_env_id(provider_type),
         type=provider_type,
         name=str(spec.get("label") or provider_type),
         enabled=True,
@@ -101,8 +54,9 @@ def env_provider(provider_type: str) -> ProviderConfig | None:
     )
 
 
-def env_provider_config(provider_type: str, spec: dict[str, Any]) -> tuple[dict[str, Any], bool]:
-    field_envs = ENV_PROVIDER_FIELDS[provider_type]
+def env_provider_config(provider_type: str) -> tuple[dict[str, Any], bool]:
+    spec = PROVIDER_TYPES.get(provider_type, {})
+    field_envs = provider_env_fields(provider_type)
     config: dict[str, Any] = {}
     has_explicit_value = False
 
@@ -118,20 +72,9 @@ def env_provider_config(provider_type: str, spec: dict[str, Any]) -> tuple[dict[
     return config, has_explicit_value
 
 
-def provider_required_fields(spec: dict[str, Any]) -> list[str]:
-    return [
-        str(field["name"])
-        for field in spec.get("fields", [])
-        if field.get("required")
-    ]
-
-
 def env_provider_is_complete(
-    provider_type: str, config: dict[str, Any], has_explicit_value: bool, required: list[str]
+    provider_type: str, config: dict[str, Any], has_explicit_value: bool, required: Collection[str]
 ) -> bool:
-    if provider_type == "wecom_bot":
-        return bool(config.get("webhook") or config.get("key"))
-
     return has_explicit_value and all(str(config.get(name, "")).strip() for name in required)
 
 
@@ -139,10 +82,11 @@ def legacy_serverchan_provider(sendkey: str) -> ProviderConfig | None:
     sendkey = str(sendkey or "").strip()
     if not sendkey:
         return None
+    spec = PROVIDER_TYPES.get("serverchan", {})
     return ProviderConfig(
-        id="serverchan-default",
+        id=provider_env_id("serverchan"),
         type="serverchan",
-        name="Server 酱",
+        name=str(spec.get("label") or "serverchan"),
         enabled=True,
         config={"sendkey": sendkey},
     )

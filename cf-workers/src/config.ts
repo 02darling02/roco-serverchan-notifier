@@ -1,97 +1,15 @@
 import type { Config, Env, ProviderConfig } from "./types";
-import { PROVIDER_TYPES } from "./provider-specs";
+import {
+  PROVIDER_TYPES,
+  providerEnvFields,
+  providerEnvId,
+} from "./provider-specs";
 
 const DEFAULT_GAME_API_URL =
   "https://wegame.shallow.ink/api/v1/games/rocom/merchant/info";
 
-interface EnvProviderMapping {
-  type: string;
-  envVars: Record<string, string>;
-  envId: string;
-}
-
-const ENV_PROVIDER_MAPPINGS: EnvProviderMapping[] = [
-  {
-    type: "serverchan",
-    envVars: { sendkey: "SERVERCHAN_SENDKEY" },
-    envId: "serverchan-default",
-  },
-  {
-    type: "pushplus",
-    envVars: {
-      token: "PUSHPLUS_TOKEN",
-      topic: "PUSHPLUS_TOPIC",
-      channel: "PUSHPLUS_CHANNEL",
-    },
-    envId: "pushplus-env",
-  },
-  {
-    type: "wecomchan",
-    envVars: {
-      corpid: "WECOM_CORPID",
-      secret: "WECOM_SECRET",
-      agentid: "WECOM_AGENTID",
-      touser: "WECOM_TOUSER",
-    },
-    envId: "wecomchan-env",
-  },
-  {
-    type: "wecom_bot",
-    envVars: { webhook: "WECOM_BOT_WEBHOOK", key: "WECOM_BOT_KEY" },
-    envId: "wecom-bot-env",
-  },
-  {
-    type: "wxpusher",
-    envVars: {
-      app_token: "WXPUSHER_APP_TOKEN",
-      uids: "WXPUSHER_UIDS",
-      topic_ids: "WXPUSHER_TOPIC_IDS",
-    },
-    envId: "wxpusher-env",
-  },
-  {
-    type: "bark",
-    envVars: {
-      server_url: "BARK_SERVER_URL",
-      device_key: "BARK_DEVICE_KEY",
-      group: "BARK_GROUP",
-    },
-    envId: "bark-env",
-  },
-  {
-    type: "dingtalk_bot",
-    envVars: { webhook: "DINGTALK_WEBHOOK", secret: "DINGTALK_SECRET" },
-    envId: "dingtalk-env",
-  },
-  {
-    type: "feishu_bot",
-    envVars: { webhook: "FEISHU_WEBHOOK", secret: "FEISHU_SECRET" },
-    envId: "feishu-env",
-  },
-  {
-    type: "ntfy",
-    envVars: {
-      base_url: "NTFY_BASE_URL",
-      topic: "NTFY_TOPIC",
-      token: "NTFY_TOKEN",
-      priority: "NTFY_PRIORITY",
-      tags: "NTFY_TAGS",
-    },
-    envId: "ntfy-env",
-  },
-  {
-    type: "gotify",
-    envVars: {
-      base_url: "GOTIFY_BASE_URL",
-      app_token: "GOTIFY_APP_TOKEN",
-      priority: "GOTIFY_PRIORITY",
-    },
-    envId: "gotify-env",
-  },
-];
-
 function envStr(env: Env, key: string): string {
-  return (env[key as keyof Env] || "").trim();
+  return (env[key] || "").trim();
 }
 
 function envBool(env: Env, key: string, defaultValue: boolean): boolean {
@@ -114,41 +32,37 @@ function envCsv(env: Env, key: string): string[] {
     .filter(Boolean);
 }
 
-function buildProviderFromEnv(
-  env: Env,
-  mapping: EnvProviderMapping
-): ProviderConfig | null {
-  const spec = PROVIDER_TYPES[mapping.type];
+function buildProviderFromEnv(env: Env, providerType: string): ProviderConfig | null {
+  const spec = PROVIDER_TYPES[providerType];
   if (!spec) return null;
 
   const config: Record<string, string> = {};
   let hasExplicitValue = false;
+  const envVars = providerEnvFields(providerType);
 
   for (const field of spec.fields) {
-    const envKey = mapping.envVars[field.name];
+    const envKey = envVars[field.name];
     const value = envKey ? envStr(env, envKey) : "";
     if (value) {
       config[field.name] = value;
       hasExplicitValue = true;
-    } else if (field.default) {
+    } else if (
+      Object.prototype.hasOwnProperty.call(field, "default") &&
+      field.default !== undefined
+    ) {
       config[field.name] = field.default;
     }
   }
 
-  // Special case: wecom_bot needs webhook OR key
-  if (mapping.type === "wecom_bot") {
-    if (!config.webhook && !config.key) return null;
-  } else {
-    if (!hasExplicitValue) return null;
-    const requiredFields = spec.fields.filter((f) => f.required);
-    for (const field of requiredFields) {
-      if (!(config[field.name] || "").trim()) return null;
-    }
+  if (!hasExplicitValue) return null;
+  const requiredFields = spec.fields.filter((f) => f.required);
+  for (const field of requiredFields) {
+    if (!(config[field.name] || "").trim()) return null;
   }
 
   return {
-    id: mapping.envId,
-    type: mapping.type,
+    id: providerEnvId(providerType),
+    type: providerType,
     name: spec.label,
     enabled: true,
     config,
@@ -157,8 +71,8 @@ function buildProviderFromEnv(
 
 export function loadConfig(env: Env): Config {
   const providers: ProviderConfig[] = [];
-  for (const mapping of ENV_PROVIDER_MAPPINGS) {
-    const provider = buildProviderFromEnv(env, mapping);
+  for (const providerType of Object.keys(PROVIDER_TYPES)) {
+    const provider = buildProviderFromEnv(env, providerType);
     if (provider) providers.push(provider);
   }
 
