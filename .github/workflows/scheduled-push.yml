@@ -3,7 +3,7 @@ name: Scheduled Push
 on:
   schedule:
     # Beijing/Hong Kong 08:05, 12:05, 16:05, 20:05.
-    - cron: "5 0,4,8,12 * * *"
+    - cron: "43 16 * * *"
   workflow_dispatch:
 
 permissions:
